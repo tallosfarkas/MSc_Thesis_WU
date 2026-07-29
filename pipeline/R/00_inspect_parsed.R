@@ -4,7 +4,7 @@
 # Purpose: Audit data/parsed/TParsed_YYYY.RData. Pure inspection — NO NLP, NO
 # cleaning, NO writes to data/. Outputs go to out/.
 #
-# Anchors Step 1 of /Users/farkastallos/.claude/plans/recursive-drifting-hare.md
+# Stage 00 of the pipeline: the audit that runs before the corpus build.
 #
 # Per-year row in out/parsed_audit.csv:
 #   year, file_size_mb, rows, unique_calls, unique_tickers,

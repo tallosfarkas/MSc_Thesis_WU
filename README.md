@@ -49,7 +49,7 @@ for the full check-list and tolerances):
 
 Honest qualifiers, stated in the thesis and reproduced by this code: the priced and tradeable
 results are US-concentrated and equal-weighted, the GeoRisk long–short is largely a cross-sector
-effect (GICS-sector-neutral *t* = 0.28), illiquidity and reversal absorb much of it, and the
+effect (GICS-sector-neutral −0.05%, *t* = −0.56), illiquidity and reversal absorb much of it, and the
 GeoRisk alpha is fragile out of sample.
 
 ## Repository layout

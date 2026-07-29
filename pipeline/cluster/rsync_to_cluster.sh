@@ -4,7 +4,7 @@ CLUSTER="${CLUSTER:-wucluster}"   # override with your own SSH host alias
 # pipeline/cluster/rsync_to_cluster.sh
 #
 # Selective rsync of the MINIMAL working set to ${CLUSTER}:~/thesis_clean/.
-# Scope (Step 1 of /Users/farkastallos/.claude/plans/recursive-drifting-hare.md):
+# Scope:
 #   * data/parsed/    (~12 GB; 24 TParsed_YYYY.RData files)
 #   * pipeline/       (configs + R + cluster scripts)
 # Excludes everything else — legacy scripts, raw, processed, archive, etc.

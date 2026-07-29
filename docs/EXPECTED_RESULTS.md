@@ -118,9 +118,11 @@ Split-half for the contemporaneous RQ1: −5.95 / −4.69.
 | SIC1-division-adjusted | 0.10% (*t* = 1.02) |
 | **GICS-sector-neutral** | **−0.05% (*t* = −0.56)** — largely a cross-sector effect |
 
-Value-weighting removes the alpha (VW *t* = 0.52), and no cell in the full sort grid (universe ×
-measure × 5/10 bins × EW/VW) clears 5% — the largest is *t* = 1.80. This is why the thesis presents
-RQ3 as an asset-pricing test rather than a tradeable product.
+Value-weighting removes the alpha (VW *t* = 0.52). Across the full 48-cell sort grid (universe ×
+measure × 5/10 bins × EW/VW, `monthly_q3_grid_min.json`) the only cell that clears 5% is US GeoRisk,
+quintile, equal-weighted (0.17%/month, *t* = 2.38); every value-weighted cell and every global-sample
+cell is insignificant. The alpha is therefore specific to one corner of the grid, which is why the
+thesis presents RQ3 as an asset-pricing test rather than a tradeable product.
 
 ## Trading costs
 

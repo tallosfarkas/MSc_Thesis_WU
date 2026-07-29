@@ -2,9 +2,15 @@
 # A dictionary bigram counts toward GeoRisk if its SAME SENTENCE contains
 # any of these unigrams (case-insensitive after tokenisation).
 #
-# Source: Sautner et al. (2023) JF, paper Eq. 3 (p. 1462). The exact word list
-# is in the Online Appendix; this is a conservative starting set. Final list
-# should be reconciled with the appendix before Stage 3.
+# Source: Sautner et al. (2023) JF, Eq. 3 (p. 1462). Sautner never enumerate
+# their risk words: Eq. 3 says only "risk", "uncertainty", or a synonym, and
+# the Internet Appendix contains no such list. Hassan et al. (2019, Online
+# Appendix p. 4) likewise describe theirs only as Oxford-dictionary synonyms
+# of "risk"/"risky"/"uncertain"/"uncertainty", also unlisted. This list is
+# therefore my own implementation of that rule, disclosed as a choice rather
+# than a match. The thesis reports a robustness run that swaps it for the
+# Hassan risk words (0.21%/month, t = 2.22), and risk_words_clean.yml drops
+# "exposure"/"exposed" to test circularity with the dictionary itself.
 
 risk_words:
   - risk
