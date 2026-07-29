@@ -42,7 +42,7 @@ export GEO_FIX=1 GEO_TAG=_min GEO_EXPO=min GEO_TIES=first
 | 02p | `pipeline/R/02p_export_sentences.R` | corpus | parquet for Python | ~30 min |
 | 02b | `pipeline/python/…` (sklearn) or `pipeline/R/02b_klr_discovery.R` | parquet / dfm | `config/dictionary_geoeconomic.csv` | 4–8 h, 64 cores, 256 GB |
 
-Chained submission (mirrors the project Makefile):
+Chained submission (matches the project Makefile):
 
 ```bash
 # from your local checkout: push code to the cluster first

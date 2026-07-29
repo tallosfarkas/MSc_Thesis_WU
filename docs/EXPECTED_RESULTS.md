@@ -100,7 +100,7 @@ vintage the following year, US CRSP:
 The tone premium survives the strictest look-ahead test; the risk-count alpha does not. The gentler
 fixed-dictionary walk-forward OOS (real-time factor betas, 36-month warm-up) passes for both:
 GeoRisk *t* = 2.23, GeoSentiment *t* = 2.36. On the global LSEG sample the re-learned tone strategy
-is fragile (*t* = 0.38), mirroring the return-source asymmetry.
+is fragile (*t* = 0.38), matching the return-source asymmetry.
 
 Split-half for the contemporaneous RQ1: −5.95 / −4.69.
 
