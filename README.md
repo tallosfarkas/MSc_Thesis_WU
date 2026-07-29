@@ -96,8 +96,9 @@ Full instructions, including which stages need the cluster and roughly how long 
 The text stages are the expensive part. Corpus build and tokenisation are per-year SLURM arrays;
 KLR discovery is a single large-memory job; exposure measurement is an array over years. The
 asset-pricing stages (`05*`) run comfortably on a laptop once the firm-quarter panel exists.
-Indicative sizes: 477,334 earnings calls parsed (456,996 after dedup), 2002–2025; the daily event study touches 43.1M daily
-return rows and 12.4M event-day observations.
+Indicative sizes, 2002–2025: 508,966 raw transcript rows, 456,996 unique calls after de-duplication,
+452,512 in the analysis sample; the daily event study touches 43.1M daily return rows and 12.4M
+event-day observations.
 
 ## Versioning
 

@@ -5,7 +5,7 @@
 >
 > * **`verify/verify_headline.R`: 14/14 PASS** against the minimal artifacts.
 > * The minimal analysis reproduced **bit-identically** on the WU cluster (from-zero run; the
->   firm-quarter panel came back with 442,543 rows and every measure `identical`).
+>   firm-quarter *exposure* panel came back with 442,543 rows and every measure `identical`).
 > * The dictionary is a **fixed shipped input**; a from-scratch cluster discovery run reproduced it
 >   **9,650/9,650 (100.000%)** and the KLR discovery stage was byte-identical (`dictionary_v1_py.csv`
 >   md5 match, `n_sentences_total` and keyness counts identical).
@@ -142,7 +142,7 @@ Both stay positive; the tone strategy is roughly halved.
 | Quarterly correlation with GPR threat index | ρ ≈ 0.25 |
 | Real-time dictionary recoverability (top-1000 overlap) | 79% at the 2012 vintage, rising to 96% by 2024 (`divergence$by_vintage$cover_top1000`) |
 | Language filter: non-English calls dropped | ≈0.7% |
-| Sample | 2002–2025; 276 monthly observations on CRSP; ~442.5k firm-months in the minimal analysis panel |
+| Sample | 2002–2025; 276 monthly observations on CRSP; 299,733 firm-quarters and 877,072 firm-months in the analysis panel |
 
 ## v1.1 → v2 map (only one cell flips)
 
