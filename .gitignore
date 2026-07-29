@@ -1,0 +1,38 @@
+# licensed / large data - never commit
+data/
+out/
+output/
+*.rds
+*.RData
+*.parquet
+*.pkl
+*.feather
+
+# third-party dictionary (download separately, see docs/DATA_ACCESS.md)
+config/lm_master_dictionary.csv
+
+# environments
+**/.venv/
+__pycache__/
+.Rproj.user/
+.Rhistory
+
+# build products
+*.pdf
+*.aux
+*.log
+*.bbl
+*.bcf
+*.blg
+*.fls
+*.fdb_latexmk
+*.out
+*.synctex.gz
+
+# OS / editor
+.DS_Store
+*~
+
+# NOTE: the discovered dictionary IS meant to be tracked here (it is the shareable
+# artifact this project produces). If your global/parent .gitignore excludes *.csv,
+# force-add it:  git add -f config/dictionary_geoeconomic.csv

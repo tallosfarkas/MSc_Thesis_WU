@@ -1,0 +1,34 @@
+# Risk-word list for the FAITHFULNESS robustness check (2026-07-05).
+# Identical to risk_words.yml (the v1.1 headline list) EXCEPT it drops the two
+# topic-adjacent words 'exposure' and 'exposed', which co-occur near-mechanically
+# with geoeconomic topic talk ('exposure to China', 'FX exposure') and partially
+# circularize GeoRisk with GeoExposure. Isolates that one lever; everything else
+# (dictionary, tokenizer, winsorisation, first-ties) is held at the v1.1 headline.
+risk_words:
+  - risk
+  - risks
+  - risky
+  - uncertain
+  - uncertainty
+  - uncertainties
+  - threat
+  - threats
+  - threaten
+  - threatened
+  - threatening
+  - danger
+  - dangerous
+  - concern
+  - concerns
+  - concerned
+  - worry
+  - worries
+  - worried
+  - fear
+  - fears
+  - fearful
+  - volatile
+  - volatility
+  - unpredictable
+  - vulnerability
+  - vulnerable

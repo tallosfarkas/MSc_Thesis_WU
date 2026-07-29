@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this code or the geoeconomic dictionary, please cite the thesis."
+title: "Geoeconomic Exposure and the Cross-Section of Individual Stock Returns"
+abstract: >-
+  A firm-level geoeconomic exposure measure built from earnings-call transcripts via
+  King-Lam-Roberts keyword discovery, and its pricing in the cross-section of stock returns.
+authors:
+  - family-names: "Tallós"
+    given-names: "Farkas Pál"
+    affiliation: "WU Vienna University of Economics and Business"
+type: thesis
+thesis-type: "MSc thesis"
+institution:
+  name: "WU Vienna University of Economics and Business"
+year: 2026
+license: MIT
+keywords:
+  - geoeconomic risk
+  - text as data
+  - earnings calls
+  - cross-section of returns
+  - asset pricing

@@ -1,0 +1,38 @@
+# Earnings-call boilerplate bigrams — small, hand-curated.
+# Stage 0 strips these AFTER sklearn-parity tokenisation but BEFORE Eq. 1
+# normalisation, because they inflate B_{i,t} without carrying signal.
+# Departure from Sautner: minor and defensible (Sautner does not strip
+# call boilerplate; their sample is much larger and the effect averages out).
+
+domain_stopword_bigrams:
+  - ladies gentlemen
+  - good morning
+  - good afternoon
+  - good evening
+  - thank you
+  - thanks operator
+  - next question
+  - last question
+  - operator instructions
+  - conference call
+  - earnings call
+  - question answer
+  - please proceed
+  - press star
+  - star one
+  - star two
+  - q a session
+  - turn call
+  - turn conference
+  - call back
+  - forward looking
+  - safe harbor
+  - safe harbour
+  # Transcript stage-direction / interpreter markers (see boilerplate.R
+  # strip_transcript_markers). Belt-and-suspenders: stripped pre-tokenisation in
+  # Stage 1, and dropped here from the bigram count in case any slip through.
+  - foreign language
+  - language foreign
+  - language interpreted
+  - speaking foreign
+  - foreign languages

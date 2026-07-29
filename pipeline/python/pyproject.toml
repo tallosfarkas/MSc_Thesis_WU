@@ -1,0 +1,20 @@
+[project]
+name = "geoexpo-discovery"
+version = "0.1.0"
+description = "Sautner-faithful KLR geoeconomic keyword discovery (sklearn). Stage 2b only; everything else is R."
+requires-python = ">=3.11,<3.14"
+# Pinned to the versions built on the WU cluster venv (sklearn 1.9 generation),
+# so `uv sync` reproduces the exact discovery environment locally and on cluster.
+dependencies = [
+    "scikit-learn==1.9.0",
+    "scipy==1.17.1",
+    "numpy==2.4.6",
+    "pandas==3.0.3",
+    "pyarrow==24.0.0",
+    "pyyaml==6.0.3",
+]
+
+[tool.uv]
+# Rebuild the cluster venv from this lock with:
+#   cd ~/thesis_clean/pipeline/python && uv sync --frozen
+package = false

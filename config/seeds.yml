@@ -1,0 +1,111 @@
+# Geoeconomic seed BIGRAMS for Sautner-style KLR keyword discovery.
+# ==============================================================================
+# Philosophy (King-Lam-Roberts 2017; Sautner et al. 2023): seeds are HIGH-PRECISION
+# ANCHORS, not a comprehensive list. The algorithm discovers coverage; seeds only
+# need to be unambiguously in-domain. v1 proved that loose/operational seeds
+# ("supply chain", "raw material") flood the reference set R with generic talk and
+# contaminate the dictionary, so we keep seeds tight, unambiguous, and BALANCED
+# across sub-themes (no single theme should dominate R).
+#
+# Every seed is anchored to the literature so the choice is defensible, not ad hoc:
+#   GPR   = Caldara & Iacoviello (2022, AER) Geopolitical Risk word list
+#   IMF   = IMF (2023) "Geoeconomic Fragmentation and FDI" (WEO Ch.4) channels
+#   CMS   = Clayton, Maggiori & Schreger (2024 framework / 2025) geoeconomic instruments
+#   KLE   = Klement (2021) Geo-Economics (economic statecraft taxonomy)
+#   BBD   = Baker, Bloom & Davis (2016) Economic Policy Uncertainty
+#
+# Count: 50 bigrams (parity with Sautner's ~50 climate seeds). The number is not
+# methodologically load-bearing — KLR/Sautner seeds are anchors, the algorithm
+# finds coverage — but we match ~50 for explicit comparability.
+#
+# Balance: energy kept NATURAL at 4 (energy security is genuinely geoeconomic; we
+# do not engineer it down at the seed stage — the resulting ~30% energy tilt in the
+# discovered dict is addressed downstream via industry-adjusted GeoExpo + an
+# ex-energy robustness version). Per theme: trade 7, sanctions 7, geopolitics 7,
+# supply 5, critical 5, tech 6, energy 4, investment 6, cyber 3 = 50. The tech and
+# investment blocks carry "critical technologies" (IMF strategic sectors) and
+# "currency manipulation" (Klement FX statecraft) so those gaps are represented.
+#
+# Every entry MUST be a BIGRAM (exactly 2 tokens) — the pipeline silently drops
+# unigrams ("reshoring") and trigrams ("supply chain disruption"). Dead two-word
+# spellings from earlier ("re shoring", "friend shoring", "tech decoupling") were
+# removed; they did not occur in the corpus.
+#
+# Seed choice is validated downstream by leave-one-seed-out perturbation (Sautner's
+# robustness test: drop each seed, re-derive, require >85% dictionary stability)
+# and external correlation of aggregate GeoExpo with the GPR index.
+# ==============================================================================
+
+seeds:
+  # --- Trade conflict (KLE; IMF; CMS) -----------------------------------------
+  - trade war
+  - trade tensions
+  - trade dispute
+  - trade barriers
+  - import tariffs
+  - retaliatory tariffs
+  - tariff increase
+
+  # --- Sanctions & export controls (CMS; GPR; KLE) ----------------------------
+  - economic sanctions
+  - financial sanctions
+  - trade sanctions
+  - export controls
+  - export restrictions
+  - entity list
+  - sanctions regime
+
+  # --- Geopolitics & security (GPR; Pastor-Veronesi 2013) ---------------------
+  - geopolitical risk
+  - geopolitical tensions
+  - geopolitical uncertainty
+  - national security
+  - foreign policy
+  - political risk
+  - regional conflict
+
+  # --- Supply-chain geoeconomic forms (IMF fragmentation) ---------------------
+  # NB: NOT bare "supply chain" (floods R with operations talk — v1 lesson).
+  - supply disruption
+  - supply security
+  - import dependence
+  - near shoring
+  - critical infrastructure
+
+  # --- Critical inputs / strategic sectors (IMF; CMS) -------------------------
+  - rare earth
+  - critical minerals
+  - critical materials
+  - semiconductor supply
+  - chip shortage
+
+  # --- Technology & decoupling (IMF tech decoupling; CMS) ---------------------
+  - technology transfer
+  - technology restrictions
+  - economic decoupling
+  - dual use
+  - export ban
+  - critical technologies
+
+  # --- Energy security (KLE; GPR energy-as-statecraft) ------------------------
+  # Kept natural at 4 (not trimmed). Energy security is genuinely geoeconomic
+  # (Russian oil/gas sanctions, OPEC, LNG). The ~30% energy tilt this produces in
+  # the discovered dict is handled DOWNSTREAM, not by suppressing seeds: primary
+  # industry-adjusted GeoExpo + an ex-energy dictionary robustness version.
+  - energy security
+  - energy independence
+  - gas supply
+  - oil supply
+
+  # --- Investment screening & industrial policy (IMF; CMS) --------------------
+  - investment screening
+  - industrial policy
+  - capital controls
+  - currency manipulation
+  - protectionist measures
+  - import substitution
+
+  # --- Cyber & data sovereignty (CMS; KLE) ------------------------------------
+  - cyber attack
+  - cyber security
+  - data sovereignty

@@ -1,0 +1,76 @@
+# Pipeline hyperparameters. Every magic number lives here, with a paper anchor.
+
+# Stage 2 — KLR keyword discovery (Sautner et al. 2023 JF Online Appendix p. 2-3)
+klr:
+  p_threshold: 0.8                # ensemble vote: promote sentence into T if any classifier P(R) > 0.8
+  reference_sample_size: 100000   # |S sample| drawn for training set (Sautner OA p. 2)
+  curate_top_k: 500               # manual face-validity review depth (Sautner OA p. 3).
+                                  # NOTE: this controls the FACE-VALIDITY REVIEW depth only, and it is
+                                  # NOT what produced the locked production dictionary. The locked
+                                  # 9,650-term dictionary is built by a different rule (see
+                                  # dictionary_selection below and docs/REPRODUCE.md). Running discovery
+                                  # with this value alone yields ~550 terms, not 9,650.
+
+  # Locked production dictionary selection (verified to reproduce 9,650/9,650 terms exactly
+  # in the from-scratch cluster re-run of 2026-07-21):
+  #   1. take the full keyness table (keyness_all_py.csv, ~17M candidate bigrams)
+  #   2. DROP the 50 seed bigrams from the candidate pool
+  #   3. keep the top 9,600 remaining bigrams by G2
+  #   4. add the 50 seeds back  ->  9,650 terms
+  dictionary_top_k: 9600          # discovered terms kept, seeds excluded from the ranking
+  dictionary_exclude_seeds: true  # seeds are added back afterwards, not ranked against the pool
+  cv_folds: 5                     # grid-search CV folds (Sautner: "grid-search cross-validation")
+  seed: 42                        # global RNG seed — pin for reproducibility across R and sklearn
+  model_vocab_size: 10000         # feature cap = top-K bigrams by total frequency. PATH-DEPENDENT:
+                                  # the R 02b caps ALL THREE classifiers (LiblineaR densifies at fit);
+                                  # the Python py-sautner caps ONLY RandomForest (NB+SVC sparse, full
+                                  # vocab) -- the production/locked dictionary comes from py-sautner.
+                                  # Does NOT limit discovery (step 8 uses full vocab). Override with
+                                  # env var RF_VOCAB_SIZE for sensitivity checks.
+  trim_min_docfreq: 5             # drop bigrams appearing in < N sentences before anything else
+
+# Tokenisation (Sautner replication code, sklearn CountVectorizer defaults)
+tokenizer:
+  lowercase: true                 # sklearn lowercase=True
+  strip_accents: unicode          # sklearn strip_accents='unicode'
+  ngram_min: 2                    # sklearn ngram_range=(2,2)
+  ngram_max: 2
+  token_pattern: '\b\w\w+\b'      # sklearn default analyzer='word' regex
+  min_token_length: 2             # implied by token_pattern \w\w+
+
+# Stage 0 — preprocessing
+preprocessing:
+  english_only: true              # Sautner p. 1456: "complete set of English-language transcripts"
+  drop_empty_speech: true
+  drop_na_ticker: true
+
+# Stage 3 — exposure measurement (Sautner Eqs. 1-4)
+exposure:
+  variants:
+    - overall      # Eq. 1  GeoExposure
+    - risk         # Eq. 3  GeoRisk (risk word in same sentence)
+    - sentiment    # Eq. 2  GeoSentiment = pos - neg (Loughran-McDonald, same sentence)
+    - tfidf        # Eq. 4  GeoExposureTFIDF, weight log(N_T / f_b); f_b at TRANSCRIPT level
+  # PRIMARY = unpruned, Sautner-scale (~9,600 discovered + 50 seeds): MAIN/headline,
+  # kept as Sautner (no hand-pruning; Eq.4 TF-IDF + aggregation handle noise).
+  # PRUNED = curated (robustness only, never headline). Both computed in one pass.
+  dictionary_primary: dictionary_geoeconomic.csv
+  dictionary_pruned: dictionary_geoeconomic_pruned.csv
+  # Loughran-McDonald 2011 master dictionary for Eq.2 (provenance: ND-SRAF master,
+  # free for academic use; source data/inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv).
+  lm_dictionary: lm_master_dictionary.csv
+  tfidf:
+    docfreq_level: transcript     # f_b = # transcripts (calls) containing bigram b (Sautner Eq.4)
+  standardize: false              # measures are RAW; within-quarter z-scoring deferred to Stage 5
+  industry_adjust:                # robustness re-run only (US sample)
+    sic_digits: 2
+    mapping: ra_project/mapping/output/ec_ccm_map_v8.rds
+
+# Stage 3.5 — event dedup + dual identifier mapping (RIC global + CRSP/v8 US)
+mapping:
+  # cross-year re-includes (same Id in multiple annual files) are deduped to one
+  # record per Id; the EARLIEST source-file ticker is the event-time anchor.
+  event_time_ticker: earliest        # earliest source-file year (closest to the call)
+  crsp_map: ra_project/mapping/output/ec_ccm_map_v8.rds   # Id == eventId, one row/eventId
+  pricing: data/processed/CLEAN_QUARTERLY_PRICING_v2.rds  # RIC-keyed (Ticker, Quarter)
+  delisting_marker: '\^.*$'          # clean_ric strips this, KEEPS the exchange suffix (.N/.O)

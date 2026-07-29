@@ -1,0 +1,38 @@
+# Risk/uncertainty word list for Sautner Eq. 3 (GeoRisk).
+# A dictionary bigram counts toward GeoRisk if its SAME SENTENCE contains
+# any of these unigrams (case-insensitive after tokenisation).
+#
+# Source: Sautner et al. (2023) JF, paper Eq. 3 (p. 1462). The exact word list
+# is in the Online Appendix; this is a conservative starting set. Final list
+# should be reconciled with the appendix before Stage 3.
+
+risk_words:
+  - risk
+  - risks
+  - risky
+  - uncertain
+  - uncertainty
+  - uncertainties
+  - threat
+  - threats
+  - threaten
+  - threatened
+  - threatening
+  - danger
+  - dangerous
+  - concern
+  - concerns
+  - concerned
+  - worry
+  - worries
+  - worried
+  - fear
+  - fears
+  - fearful
+  - volatile
+  - volatility
+  - unpredictable
+  - exposure
+  - exposed
+  - vulnerability
+  - vulnerable
