@@ -17,7 +17,8 @@ options(stringsAsFactors = FALSE)
 suppressPackageStartupMessages({ library(data.table); library(arrow); library(jsonlite); library(lubridate); library(readxl); library(ggplot2) })
 have_nw <- requireNamespace("sandwich", quietly = TRUE)
 .root <- function(){d<-normalizePath(getwd());while(d!="/"){if(file.exists(file.path(d,"pipeline/config/params.yml")))return(d);d<-dirname(d)};stop("no root")}
-ROOT <- .root(); ANA <- file.path(ROOT,"out","analysis"); EXP <- file.path(ROOT, if (nzchar(Sys.getenv("GEOV2"))||identical(Sys.getenv("GEO_EXPO"),"v2")) "out/exposure_v2" else "out/exposure"); MAC <- file.path(ROOT,"data/inputs/macro"); FIG <- file.path(ROOT,"out","figures")
+ROOT <- .root(); ANA <- file.path(ROOT,"out","analysis"); EXP <- file.path(ROOT, "out", { .e <- Sys.getenv("GEO_EXPO")
+    if (nzchar(Sys.getenv("GEOV2")) || identical(.e, "v2")) "exposure_v2" else if (nzchar(.e)) paste0("exposure_", .e) else "exposure" }); MAC <- file.path(ROOT,"data/inputs/macro"); FIG <- file.path(ROOT,"out","figures")
 say <- function(...) cat(sprintf(...),"\n"); NW <- 6L
 # ---- V2 correctness track (audit 2026-06-12): GEOV2=1 -> corrected pipeline, _v2 paths ----
 FIX  <- nzchar(Sys.getenv("GEOV2")) || nzchar(Sys.getenv("GEO_FIX"))            # all audit timing/inference fixes
@@ -70,15 +71,20 @@ F <- Reduce(function(a,b) merge(a,b,by="Month",all.x=TRUE),
 setorder(F, Month)
 
 # ---- GeoRisk L/S series: CRSP (headline) + LSEG -----------------------------
-ls_crsp <- { fq<-as.data.table(readRDS(file.path(EXP,"exposure_firmquarter_crsp.rds"))); fq[,permno:=as.integer(permno)]
+# 2026-07-31: the same ladder is now run for GeoSentiment as well. The GeoRisk keys
+# (crsp/lseg) are left exactly as they were so nothing downstream changes; the new
+# measure is written under crsp_<meas>/lseg_<meas>.
+mk_crsp <- function(MEAS) { fq<-as.data.table(readRDS(file.path(EXP,"exposure_firmquarter_crsp.rds"))); fq[,permno:=as.integer(permno)]
   fq[, form_q:=as.Date(ISOdate(year,(quarter-1L)*3L+1L,1L))]
   hm<-fq[rep(seq_len(.N),each=3L)]; hm[,kk:=rep(0:2,times=nrow(fq))]; hm[,Month:=form_q %m+% months(3L+kk)]
   ret<-as.data.table(readRDS(file.path(ANA,"crsp_returns_monthly.rds"))); ret[,permno:=as.integer(permno)]
   p<-merge(hm,ret[,.(permno,Month,RetM)],by=c("permno","Month")); p<-p[is.finite(RetM)]
   p[, RetM:=pmin(pmax(RetM,quantile(RetM,.005,na.rm=T)),quantile(RetM,.995,na.rm=T)),by=Month]
-  p[, q:=qbin(GeoRisk),by=Month]; w<-dcast(p[,.(r=mean(RetM)),by=.(Month,q)],Month~q,value.var="r"); w[,LS:=get("5")-get("1")]; w[is.finite(LS),.(Month,LS)] }
-ls_lseg <- { p<-PM[is.finite(GeoRisk)&is.finite(RetM_w)]; p[,q:=qbin(GeoRisk),by=Month]
+  p<-p[is.finite(get(MEAS))]
+  p[, q:=qbin(get(MEAS)),by=Month]; w<-dcast(p[,.(r=mean(RetM)),by=.(Month,q)],Month~q,value.var="r"); w[,LS:=get("5")-get("1")]; w[is.finite(LS),.(Month,LS)] }
+mk_lseg <- function(MEAS) { p<-PM[is.finite(get(MEAS))&is.finite(RetM_w)]; p[,q:=qbin(get(MEAS)),by=Month]
   w<-dcast(p[,.(r=mean(RetM_w)),by=.(Month,q)],Month~q,value.var="r"); w[,LS:=get("5")-get("1")]; w[is.finite(LS),.(Month,LS)] }
+ls_crsp <- mk_crsp("GeoRisk"); ls_lseg <- mk_lseg("GeoRisk")
 
 span <- function(ls, rhs){ d<-merge(ls,F,by="Month"); d<-d[is.finite(LS)&is.finite(MktRF)]
   d<-d[complete.cases(d[,c("LS",rhs),with=FALSE])]; if(nrow(d)<24) return(c(alpha=NA,t=NA,n=nrow(d)))
@@ -94,6 +100,8 @@ run <- function(ls,label){ say("\n=== %s GeoRisk L/S — extra-factor spanning (
   for(nm in names(res)) say("  %-18s alpha=%.4f%%/m (t=%.2f, n=%d)", nm, 100*res[[nm]]["alpha"], res[[nm]]["t"], res[[nm]]["n"])
   res }
 out <- list(crsp = run(ls_crsp,"CRSP"), lseg = run(ls_lseg,"LSEG"),
+            crsp_GeoSentiment = run(mk_crsp("GeoSentiment"),"CRSP GeoSentiment"),
+            lseg_GeoSentiment = run(mk_lseg("GeoSentiment"),"LSEG GeoSentiment"),
             factors_available = intersect(c("UMD","BAB","QMJ","ILLIQ","REV"), have),
             note="ILLIQ/REV built from LSEG daily/monthly; BAB/QMJ = AQR USA series")
 write_json(out, vS(file.path(ANA,"extra_factors.json")), pretty=TRUE, auto_unbox=TRUE, na="null", digits=6)

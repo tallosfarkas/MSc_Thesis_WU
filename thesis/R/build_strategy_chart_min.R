@@ -291,7 +291,7 @@ local({
   rows <- list()
   for (mm in c("GeoRisk", "GeoSentiment")) {
     a <- ann(tc_net(mm)$gross)
-    rows[[length(rows)+1]] <- sprintf("%s long--short (Q5$-$Q1) & %.1f & %.1f & %.2f \\\\",
+    rows[[length(rows)+1]] <- sprintf("%s$^{\\text{raw}}$ long--short (Q5$-$Q1) & %.1f & %.1f & %.2f \\\\",
                                       mm, a["ret"], a["vol"], a["sh"])
     if (!is.null(p_rt)) { b <- ann(tc_net(mm, p_rt)$gross)
       rows[[length(rows)+1]] <- sprintf("\\quad re-learned dictionary (OOS) & %.1f & %.1f & %.2f \\\\",

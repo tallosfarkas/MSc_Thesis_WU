@@ -32,8 +32,11 @@ J <- function(f) {
 fnum <- function(x, d = 2) ifelse(is.na(x), "", sprintf(paste0("%.", d, "f"), x))
 fpct <- function(x, d = 2) fnum(100 * x, d)
 star <- function(t) { a <- abs(t); ifelse(is.na(t), "", ifelse(a >= 2.58, "***", ifelse(a >= 1.96, "**", ifelse(a >= 1.64, "*", "")))) }
-cellp <- function(coef, t, d = 2) paste0(fpct(coef, d), star(t))        # percent + stars
-cellpt<- function(coef, t, d = 2) paste0("(", fnum(t, d), ")")
+# coef and t in SEPARATE columns. Bold at 5% exactly as fcell does, so significance
+# looks the same in every table in the thesis.
+bf    <- function(x, t) if (!is.na(t) && abs(t) >= 1.96) sprintf("\\textbf{%s}", x) else x
+cellp <- function(coef, t, d = 2) bf(paste0(fpct(coef, d), star(t)), t)
+cellpt<- function(coef, t, d = 2) bf(paste0("(", fnum(t, d), ")"), t)
 # combined "coef* (t)" cell, BOLD when significant at 5% -- makes significance unmissable
 fcell <- function(coef, t, d = 2) {
   v <- paste0(fpct(coef, d), star(t)); tt <- paste0("(", fnum(t, 2), ")")
@@ -41,7 +44,17 @@ fcell <- function(coef, t, d = 2) {
 NICE  <- c(GeoExposure = "GeoExposure", GeoExposureTFIDF = "GeoExposure (TF-IDF)",
            GeoRisk = "GeoRisk", GeoSentiment = "GeoSentiment",
            GeoExposure_pr = "GeoExposure (pruned)", GeoExposureTFIDF_pr = "GeoExposure (TF-IDF, pruned)")
-nice  <- function(m) ifelse(m %in% names(NICE), NICE[m], m)
+# Every measure label carries its true identity: ^std where the measure enters
+# z-scored (RQ1/RQ2 regressions, csz() in 05m/05d/05f) and ^raw where it enters as
+# the level (the RQ3 quintile sorts rank the raw column, frank() in 05b/05j, and the
+# descriptives are levels). Each table block sets .SUP before building its rows.
+.SUP  <- ""
+R <- "$^{\\text{raw}}$"; S <- "$^{\\text{std}}$"   # literal-label tables use these directly
+supStd <- function() .SUP <<- "$^{\\text{std}}$"
+supRaw <- function() .SUP <<- "$^{\\text{raw}}$"
+supOff <- function() .SUP <<- ""
+nice  <- function(m) { n <- ifelse(m %in% names(NICE), NICE[m], m)
+                       if (nzchar(.SUP)) paste0(n, .SUP) else n }
 
 writetab <- function(file, lines) writeLines(lines, file.path(tabdir, file))
 tabular  <- function(colspec, header_lines, body_rows)
@@ -114,8 +127,9 @@ M4 <- c("GeoExposure", "GeoExposureTFIDF", "GeoRisk", "GeoSentiment")
 
 ## Q1 -- realization: contemp return (%) + IVOL (bps) + TVOL (bps, systematic-risk check)
 local({
+  supStd()
   rr <- q1$results; tv <- J("volatility_q1.json")$tvol
-  bpsc <- function(coef, t) paste0(sprintf("%.1f", 10000*coef), star(t))   # coef in bps + stars
+  bpsc <- function(coef, t) bf(paste0(sprintf("%.1f", 10000*coef), star(t)), t)  # bps + stars, bold at 5%
   rows <- vapply(M4, function(m) {
     a <- rr[rr$measure == m, ]; b <- v1[v1$measure == m, ]; d <- tv[tv$measure == m, ]
     sprintf("%s & %s & %s & %s & %s & %s & %s \\\\", nice(m),
@@ -130,9 +144,11 @@ local({
 
 ## Q1 event study -- Q5-Q1 CAAR (%) by window, four measures (market model)
 local({
+  supRaw()
   es  <- J("event_study.json")$results
   mm  <- c("GeoExposure","GeoExposureTFIDF","dCC","GeoRisk","GeoSentiment")
-  lab <- c(GeoExposure="GeoExposure", GeoExposureTFIDF="GeoExposure (TF-IDF)", dCC="$\\Delta$GeoExposure", GeoRisk="GeoRisk", GeoSentiment="GeoSentiment")
+  lab <- c(GeoExposure=paste0("GeoExposure", R), GeoExposureTFIDF=paste0("GeoExposure (TF-IDF)", R),
+           dCC=paste0("$\\Delta$GeoExposure", R), GeoRisk=paste0("GeoRisk", R), GeoSentiment=paste0("GeoSentiment", R))
   ord <- c("full","pre","event","post")
   cell <- function(w) paste0(fpct(w$q5_minus_q1), star(w$t), "~(", fnum(w$t), ")")
   rows <- vapply(mm, function(m){ W <- es[[m]]$windows$market_model
@@ -145,6 +161,7 @@ local({
 ## Q2 PRICING -- one table per (sample x frequency); bold = significant ----------
 # LSEG global, QUARTERLY: FM univariate | FM + controls | panel-FE + controls
 local({
+  supStd()
   fm <- J("fama_macbeth_ric.json")$results; pf <- J("panel_fe_ric.json")$results
   rows <- vapply(M4, function(m) { u <- fm$univariate[fm$measure==m,]; c2 <- fm$with_controls[fm$measure==m,]
     fe <- pf$fe_plus_controls[pf$measure==m,]
@@ -154,6 +171,7 @@ local({
       " & $\\lambda$~$(t)$ & $\\lambda$~$(t)$ & coef~$(t)$\\\\"), rows)) })
 # LSEG global, MONTHLY: FM | panel-FE
 local({
+  supStd()
   mq <- J("monthly_q2.json")$q2
   rows <- vapply(M4, function(m) { r <- mq[mq$measure==m,]
     sprintf("%s & %s & %s \\\\", nice(m), fcell(r$fm_lambda,r$fm_t), fcell(r$fe_coef,r$fe_t)) }, character(1))
@@ -161,16 +179,19 @@ local({
     c("Measure & FM $\\lambda$~$(t)$ & Panel FE coef~$(t)$\\\\"), rows)) })
 # CRSP US, QUARTERLY FM
 local({
+  supStd()
   cq <- J("crsp_analysis.json")$q2
   rows <- vapply(M4, function(m) { r <- cq[cq$measure==m,]; sprintf("%s & %s \\\\", nice(m), fcell(r$fm_lambda,r$fm_t)) }, character(1))
   writetab("tab_q2_crsp_quarterly.tex", tabular("lc", c("Measure & FM $\\lambda$~$(t)$\\\\"), rows)) })
 # CRSP US, MONTHLY FM
 local({
+  supStd()
   c2 <- cm$q2
   rows <- vapply(M4, function(m) { r <- c2[c2$measure==m,]; sprintf("%s & %s \\\\", nice(m), fcell(r$fm_lambda,r$fm_t)) }, character(1))
   writetab("tab_q2_crsp_monthly.tex", tabular("lc", c("Measure & FM $\\lambda$~$(t)$\\\\"), rows)) })
 # LSEG US-only, QUARTERLY (appendix): FM univariate | FM + controls
 local({
+  supStd()
   fu <- J("fama_macbeth_ric_us.json")$results
   rows <- vapply(M4, function(m) { u <- fu$univariate[fu$measure==m,]; c2 <- fu$with_controls[fu$measure==m,]
     sprintf("%s & %s & %s \\\\", nice(m), fcell(u$lambda_q,u$nw_t), fcell(c2$lambda_q,c2$nw_t)) }, character(1))
@@ -183,25 +204,30 @@ rows_crsp <- function(df) vapply(M4, function(m) { r <- df[df$measure==m,]
   sprintf("%s & %s & %s \\\\", nice(m), fcell(r$ew_alpha,r$ew_t), fcell(r$vw_alpha,r$vw_t)) }, character(1))
 # LSEG global, QUARTERLY
 local({
+  supRaw()
   ps <- J("portfolio_sorts_ric.json")$results
   rows <- vapply(M4, function(m) { e <- ps$ew_ls_ff5[ps$measure==m,]; v <- ps$vw_ls_ff5[ps$measure==m,]
     sprintf("%s & %s & %s \\\\", nice(m), fcell(e$alpha_q,e$nw_t), fcell(v$alpha_q,v$nw_t)) }, character(1))
   writetab("tab_q3_lseg_quarterly.tex", tabular("lcc", hdr3, rows)) })
 # LSEG global, MONTHLY (from the sort grid, 5 bins)
 local({
+  supRaw()
   g <- J("monthly_q3_grid.json")$grid; g <- g[g$universe=="global" & g$nbin==5,]
   rows <- vapply(M4, function(m) { e <- g[g$measure==m & g$weight=="EW",]; v <- g[g$measure==m & g$weight=="VW",]
     sprintf("%s & %s & %s \\\\", nice(m), fcell(e$alpha_m,e$t), fcell(v$alpha_m,v$t)) }, character(1))
   writetab("tab_q3_lseg_monthly.tex", tabular("lcc", hdr3, rows)) })
 # CRSP US, QUARTERLY
 local({ writetab("tab_q3_crsp_quarterly.tex", tabular("lcc", hdr3, rows_crsp(J("crsp_analysis.json")$q3))) })
+  supRaw()
 # CRSP US, MONTHLY (headline)
 local({ writetab("tab_q3_crsp_monthly.tex", tabular("lcc", hdr3, rows_crsp(cm$q3))) })
+  supRaw()
 # Winsorisation robustness -- the headline EW alpha with monthly returns winsorised at
 # 0.5/99.5 (the main specification) against raw returns. Built here rather than typed:
 # the hand-maintained version had drifted, showing 0.26** where the generated CRSP
 # table shows 0.26*** for the same estimate (|t| = 2.74 clears the 1% cutoff).
 local({
+  supRaw()
   w <- cm$q3; r <- J("crsp_monthly_rawrb.json")$q3
   g <- function(df, m, col) df[[col]][df$measure == m]
   rows <- vapply(c("GeoRisk", "GeoSentiment"), function(m)
@@ -209,9 +235,10 @@ local({
             fcell(g(w, m, "ew_alpha"), g(w, m, "ew_t")),
             fcell(g(r, m, "ew_alpha"), g(r, m, "ew_t"))), character(1))
   writetab("tab_winsor_robustness.tex",
-           tabular("lcc", c(" & Winsorised (0.5/99.5) & Raw \\\\"), rows)) })
+           tabular("lcc", c(" & Winsorised (0.5/99.5) & Un-winsorised \\\\"), rows)) })
 # LSEG US-only, QUARTERLY (appendix)
 local({
+  supRaw()
   pu <- J("portfolio_sorts_ric_us.json")$results
   rows <- vapply(M4, function(m) { e <- pu$ew_ls_ff5[pu$measure==m,]; v <- pu$vw_ls_ff5[pu$measure==m,]
     sprintf("%s & %s & %s \\\\", nice(m), fcell(e$alpha_q,e$nw_t), fcell(v$alpha_q,v$nw_t)) }, character(1))
@@ -219,6 +246,7 @@ local({
 
 ## Robustness -- GeoRisk across splits (appendix)
 local({
+  supRaw()
   rb <- J("robustness_q3.json"); splits <- c("quintile","decile","size_neutral","pre2018","post2018","sic2_adj","fic300_adj")
   lab <- c("Quintile","Decile","Size-neutral","Pre-2018","Post-2018","Industry-adj.","FIC300-adj.")
   rows <- vapply(splits, function(s) { x <- rb$GeoRisk[[s]]
@@ -228,6 +256,7 @@ local({
 
 ## Augmented spanning -- GeoRisk alpha across factor models + macro loadings (CRSP)
 local({
+  supRaw()
   mo <- asp$crsp$models; ld <- asp$crsp$loadings
   mods <- c(M0_FF5 = "FF5", M1_FF5_UMD = "FF5 + UMD", M2_FF5_GPR_EPU = "FF5 + GPR + EPU", M3_augmented = "Augmented (8-factor)")
   rows <- vapply(names(mods), function(k)
@@ -244,6 +273,7 @@ local({
 
 ## gvkey (firm-level) robustness -- GeoRisk + GeoSentiment
 local({
+  supRaw()
   gv <- J("crsp_gvkey.json")
   cell2 <- function(q, m) sprintf("%s~%s", cellp(q$ew_alpha[q$measure==m], q$ew_t[q$measure==m]),
                                   cellpt(0, q$ew_t[q$measure==m]))
@@ -255,6 +285,7 @@ local({
     c("Aggregation & GeoRisk EW L/S $\\alpha$~$(t)$ & GeoSentiment EW L/S $\\alpha$~$(t)$\\\\"), rows)) })
 ## HP controls -- geo coefficient ~unchanged with Hoberg-Phillips controls (monthly)
 local({
+  supStd()
   hp <- J("hp_controls.json")$monthly
   rows <- vapply(M4, function(m) { a <- hp$q2[hp$q2$measure==m,]; b <- hp$panel_fe[hp$panel_fe$measure==m,]
     sprintf("%s & %s & %s & %s & %s \\\\", nice(m),
@@ -267,6 +298,7 @@ local({
 
 ## TNIC product-market spillover -- own vs peer geoeconomic exposure
 local({
+  supStd()
   tn <- J("tnic_spillover.json")$results
   p <- function(v) { v <- as.numeric(unlist(v)); fcell(v[1], v[2]) }
   rows <- vapply(seq_len(nrow(tn)), function(i)
@@ -279,6 +311,7 @@ local({
 
 ## Robustness -- GeoRisk L/S across all measures x specifications
 local({
+  supRaw()
   rb <- J("robustness_q3.json"); meas <- c("GeoExposure","GeoExposureTFIDF","GeoRisk","GeoSentiment")
   splits <- c("quintile","decile","size_neutral","pre2018","post2018","sic2_adj","fic300_adj")
   lab <- c("Quintile","Decile","Size-neutral","Pre-2018","Post-2018","Industry-adj.","FIC300-adj.")
@@ -291,6 +324,7 @@ local({
 
 ## Full monthly sort grid -- DISABLED for v2: tab_q3_grid.tex is built CRSP-only and kept static (do not clobber)
 if (FALSE) local({
+  supRaw()
   g <- J("monthly_q3_grid.json")$grid
   g <- g[order(g$universe, match(g$measure, names(NICE)), g$nbin, g$weight), ]
   rows <- vapply(seq_len(nrow(g)), function(i)
@@ -308,6 +342,7 @@ if (FALSE) local({
 
 ## Q1 monthly contemporaneous return (robustness on the realization result)
 local({
+  supStd()
   m1 <- J("monthly_q1.json")$q1
   rows <- vapply(M4, function(m) { r <- m1[m1$measure==m,]; sprintf("%s & %s \\\\", nice(m), fcell(r$coef,r$t)) }, character(1))
   writetab("tab_q1_monthly.tex", tabular("lc", c("Measure & Contemp.\\ return coef~$(t)$\\\\"), rows)) })
@@ -319,6 +354,7 @@ cat("tables OK\n")
 # =====================================================================
 ## Fig 1 -- all four measures over time (z-scored so their common profile is comparable)
 local({
+  supOff()   # plain names on figure axes: ggplot cannot render LaTeX
   ex <- readRDS(file.path(root, "out", "exposure", "exposure_firmquarter_ric.rds")); setDT(ex)
   M4v <- c("GeoExposure","GeoExposureTFIDF","GeoRisk","GeoSentiment")
   ts <- ex[!is.na(year) & !is.na(quarter), lapply(.SD, mean, na.rm=TRUE), .SDcols=M4v,
@@ -328,7 +364,7 @@ local({
   tsl[, z := (val - mean(val, na.rm=TRUE)) / sd(val, na.rm=TRUE), by=series]
   tsl[, series := factor(as.vector(nice(as.character(series))), levels=as.vector(nice(M4v)))]
   base <- ggplot(tsl, aes(date, z)) +
-    geom_vline(xintercept=as.Date(c("2018-01-01","2020-01-01","2022-01-01")), linetype="dotted", colour="grey60") +
+    geom_vline(xintercept=as.Date(c("2018-01-01","2020-01-01","2022-01-01","2025-04-01")), linetype="dotted", colour="grey60") +
     geom_hline(yintercept=0, colour="grey85") +
     labs(x=NULL, y="Standardized quarterly mean (z-score)") + theme_thesis()
   pc <- base + geom_line(aes(colour=series), linewidth=0.6) + scale_colour_manual(values=PASTEL[1:4])
@@ -337,6 +373,7 @@ local({
 
 ## Fig 1b -- same four measures over time, faceted (raw levels, own y-scale per panel)
 local({
+  supOff()   # plain names on figure axes: ggplot cannot render LaTeX
   ex <- readRDS(file.path(root, "out", "exposure", "exposure_firmquarter_ric.rds")); setDT(ex)
   M4v <- c("GeoExposure","GeoExposureTFIDF","GeoRisk","GeoSentiment")
   ts <- ex[!is.na(year) & !is.na(quarter), lapply(.SD, mean, na.rm=TRUE), .SDcols=M4v,
@@ -345,7 +382,7 @@ local({
   tsl[, series := factor(as.vector(nice(as.character(series))), levels=as.vector(nice(M4v)))]
   scols <- setNames(PASTEL[1:4], as.vector(nice(M4v)))   # same colour per measure as the combined plots
   base <- ggplot(tsl, aes(date, val)) + facet_wrap(~series, scales="free_y", nrow=2) +
-    geom_vline(xintercept=as.Date(c("2018-01-01","2020-01-01","2022-01-01")), linetype="dotted", colour="grey60") +
+    geom_vline(xintercept=as.Date(c("2018-01-01","2020-01-01","2022-01-01","2025-04-01")), linetype="dotted", colour="grey60") +
     labs(x=NULL, y="Cross-firm quarterly mean (raw level)") + theme_thesis() + theme(legend.position="none")
   pc <- base + geom_line(aes(colour=series), linewidth=0.6) + scale_colour_manual(values=scols)
   pb <- base + geom_line(colour="black", linewidth=0.5)
@@ -448,6 +485,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
 
   ## Fig R3 -- RQ1 coefficient forest (contemp return + IVOL + total vol), four measures, 95% CI
   local({
+    supOff()   # plain names on figure axes: ggplot cannot render LaTeX
     rr <- q1$results; vv <- v1; tv <- J("volatility_q1.json")$tvol
     df <- rbindlist(lapply(M4, function(m){ a<-rr[rr$measure==m,]; b<-vv[vv$measure==m,]; d<-tv[tv$measure==m,]
       rbind(data.table(measure=as.vector(nice(m)), panel="Contemp. return",     coef=a$ret_contemp$coef, t=a$ret_contemp$t),
@@ -523,6 +561,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
   # ---- Descriptive-statistics artefacts (Section 4.1) -----------------
   ## Table -- summary statistics of the four measures (Sautner Table I style; x1000)
   local({
+    supRaw()
     SC <- 1000
     st <- rbindlist(lapply(M4, function(m){ x <- PN[[m]]; x <- x[is.finite(x)]
       data.table(Measure=as.vector(nice(m)), N=length(x), Mean=SC*mean(x), SD=SC*sd(x),
@@ -550,6 +589,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
 
   ## Figure -- distribution (density) of the four measures, log scale, positive values
   local({
+    supOff()   # plain names on figure axes: ggplot cannot render LaTeX
     dd <- melt(PN[, c("Ticker", M4), with=FALSE], id.vars="Ticker", variable.name="measure", value.name="val")
     dd <- dd[is.finite(val) & val>0]; dd[, measure := factor(as.vector(nice(as.character(measure))), levels=as.vector(nice(M4)))]
     pc <- ggplot(dd, aes(val, fill=measure, colour=measure)) + geom_density(alpha=0.35, linewidth=0.4) +
@@ -562,6 +602,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
   ## Figure -- same distributions in RAW LEVELS, one panel per measure (shows the true
   ## right-skew, GeoRisk's zero pile-up, and GeoSentiment's negative mass; aligns with the text)
   local({
+    supOff()   # plain names on figure axes: ggplot cannot render LaTeX
     dd <- melt(PN[, c("Ticker", M4), with=FALSE], id.vars="Ticker", variable.name="measure", value.name="val")
     dd <- dd[is.finite(val)]; dd[, val := 1000*val]
     dd[, measure := factor(as.vector(nice(as.character(measure))), levels=as.vector(nice(M4)))]
@@ -582,6 +623,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
 # 4. RQ2 ARTEFACTS (pricing): FM forest, quintile bars, tone-legs fig; not-PEAD + tone-decomp tables
 # =====================================================================
 local({
+  supOff()   # figures first: plain names, ggplot cannot render LaTeX
   ## Fig q2 forest -- FM price of risk by measure (LSEG quarterly univariate); only GeoSentiment clears 0
   fm <- J("fama_macbeth_ric.json")$results
   df <- rbindlist(lapply(M4, function(m){ u <- fm$univariate[fm$measure==m,]
@@ -634,11 +676,14 @@ local({
   pcd <- J("pead_control.json"); cols <- c("baseline","plus_announcement","plus_reversal","plus_both")
   rfe <- sprintf("Panel FE & %s \\\\", paste(vapply(cols, function(c) fnum(pcd$sentiment_fe[[c]]$t), character(1)), collapse=" & "))
   rfm <- sprintf("Fama--MacBeth & %s \\\\", paste(vapply(cols, function(c) fnum(pcd$sentiment_fm[[c]]$t), character(1)), collapse=" & "))
+  supStd()   # tables from here on carry the identity superscript
   writetab("tab_q2_pead.tex", tabular("lcccc",
     c("$t$(GeoSentiment) & Baseline & $+$ ann.\\ return & $+$ reversal & $+$ both\\\\"), c(rfe, rfm)))
 
   ## Table q2 tone-decomp (A10b): FM lambda + panel-FE coef for GeoSentiment / Pos / Neg
-  legs2 <- c(GeoSentiment="GeoSentiment $=$ Pos $-$ Neg", GeoSentimentPos="Positive-sentiment leg", GeoSentimentNeg="Negative-sentiment leg")
+  legs2 <- c(GeoSentiment=paste0("GeoSentiment", S, " $=$ Pos $-$ Neg"),
+             GeoSentimentPos=paste0("Positive-sentiment leg", S),
+             GeoSentimentNeg=paste0("Negative-sentiment leg", S))
   rows2 <- vapply(names(legs2), function(k){ x <- sd[[k]]
     sprintf("%s & %s & %s \\\\", legs2[k], fcell(x$fm_q_lseg$lambda, x$fm_q_lseg$t), fcell(x$fe_q_lseg$coef, x$fe_q_lseg$t)) }, character(1))
   writetab("tab_q2_tone_decomp.tex", tabular("lcc",
@@ -649,7 +694,7 @@ local({
   writetab("tab_q2_tone_decomp_fm.tex", tabular("lc", c("Leg & FM $\\lambda$~$(t)$\\\\"), rows2f))
   ## Table q2 size: GeoSentiment forward premium, small vs large firms (underreaction test)
   sz <- J("defense_cuts.json")$sentiment_underreaction_by_size
-  szlab <- c(GeoSentiment="GeoSentiment (net)", Pos="Positive-sentiment leg")
+  szlab <- c(GeoSentiment=paste0("GeoSentiment", S, " (net)"), Pos=paste0("Positive-sentiment leg", S))
   rows_sz <- vapply(names(szlab), function(k){ x <- sz[[k]]
     sprintf("%s & %s & %s \\\\", szlab[k], fcell(x$small$lambda, x$small$t), fcell(x$large$lambda, x$large$t)) }, character(1))
   writetab("tab_q2_size.tex", tabular("lcc",
@@ -661,6 +706,7 @@ local({
 # 5. RQ3 / ROBUSTNESS / OOS ARTEFACTS (loadings, characteristics, region; illiquidity table; OOS bars)
 # =====================================================================
 local({
+  supRaw()
   M <- J("results_master.json"); asp <- J("augmented_spanning.json")
   ## Fig -- macro-factor loadings of the GeoRisk L/S (A13): no macro factor spans the alpha
   ld <- asp$crsp$loadings
@@ -755,12 +801,30 @@ local({
   rd  <- J("realtime_dict_oos.json")$crsp_realtime
   inEW <- function(meas) { r <- cm$q3[cm$q3$measure == meas, ]; fcell(r$ew_alpha, r$ew_t) }  # identical to Table 4.8
   rows_rd <- c(
-    sprintf("GeoRisk & %s & %s \\\\", inEW("GeoRisk"), fcell(rd$GeoRisk$realtime$alpha, rd$GeoRisk$realtime$t)),
-    sprintf("GeoSentiment & %s & %s \\\\", inEW("GeoSentiment"), fcell(rd$GeoSentiment$realtime$alpha, rd$GeoSentiment$realtime$t)))
+    sprintf("GeoRisk%s & %s & %s \\\\", R, inEW("GeoRisk"), fcell(rd$GeoRisk$realtime$alpha, rd$GeoRisk$realtime$t)),
+    sprintf("GeoSentiment%s & %s & %s \\\\", R, inEW("GeoSentiment"), fcell(rd$GeoSentiment$realtime$alpha, rd$GeoSentiment$realtime$t)))
   writetab("tab_q3_rediscovery.tex", tabular("lcc",
     c("Measure & In-sample $\\alpha$~$(t)$ & OOS, re-learned dictionary $\\alpha$~$(t)$\\\\"), rows_rd))
   cat("RQ3/robustness/OOS artefacts OK\n")
 })
+
+## Q3 -- the same factor ladder for GeoSentiment (appendix). Built from the same
+## extra_factors json, which since 2026-07-31 also carries the GeoSentiment L/S.
+## The pattern is the mirror of GeoRisk: illiquidity and reversal ADD to the
+## GeoSentiment alpha instead of absorbing it.
+local({
+  supRaw()
+  ef <- J("extra_factors.json")
+  if (is.null(ef$crsp_GeoSentiment)) { message("tab_q3_illiq_sent: GeoSentiment ladder missing, skipped"); return(invisible()) }
+  mods <- c("M0_FF5","M1_FF5_UMD","M2_FF5_BAB_QMJ","M3_FF5_ILLIQ_REV","M4_all")
+  cell <- function(v) fcell(v[[1]], v[[2]])
+  rowf <- function(lab, blk) sprintf("%s & %s \\\\", lab,
+            paste(vapply(mods, function(m) cell(blk[[m]]), character(1)), collapse = " & "))
+  writetab("tab_q3_illiq_sent.tex", tabular("lccccc",
+    c("Sample & FF5 & $+$ UMD & $+$ BAB, QMJ & $+$ illiq, rev & $+$ all \\\\"),
+    c(rowf("US (CRSP)",    ef$crsp_GeoSentiment),
+      rowf("Global (LSEG)", ef$lseg_GeoSentiment))))
+  cat("wrote tab_q3_illiq_sent.tex\n") })
 
 # =====================================================================
 # 6. VALIDATION + WHOLE-PICTURE FIGURES (appendix)
@@ -772,6 +836,7 @@ local({
 ## readable; each legend entry carries its own level correlation with GPR threats.
 ## Same file as the GPR_RHO the prose quotes (out/exposure_min/gpr_quarterly.csv).
 local({
+  supOff()   # plain names on figure axes: ggplot cannot render LaTeX
   gp <- tryCatch(fread(file.path(root, "out/exposure_min/gpr_quarterly.csv")), error = function(e) NULL)
   if (is.null(gp) || !"GeoSentiment" %in% names(gp)) {
     cat("min gpr_quarterly.csv missing/stale -- fig_gpr_validation skipped\n"); return(invisible()) }
@@ -805,6 +870,7 @@ local({
 ## t-statistic heatmap -- the whole picture on one panel: every headline test (rows)
 ## by the four measures (columns), fill = t-statistic, value printed in the cell.
 local({
+  supOff()   # plain names on figure axes: ggplot cannot render LaTeX
   MM <- fread(file.path(ana, "RESULTS_MASTER_min.csv"))
   spec <- list(
     c("Q1_realization","contemp_ret","LSEG","quarterly","RQ1 return at the call (LSEG)"),
@@ -825,7 +891,17 @@ local({
   d <- rbind(d, data.table(label = "RQ2 Fama–MacBeth (CRSP, quarterly)",
                            measure = cq2$measure[cq2$measure %in% M4],
                            t = as.numeric(cq2$fm_t[cq2$measure %in% M4])))
-  labs_o <- c(sapply(spec[1:5], `[`, 5), "RQ2 Fama–MacBeth (CRSP, quarterly)", sapply(spec[6:7], `[`, 5))
+  ## RQ3 out of sample: the re-learned real-time dictionary (CRSP, monthly). Only the
+  ## two measures that carry a tradeable result were re-discovered, so the count columns
+  ## are deliberately empty rather than zero.
+  rtd <- tryCatch(J("realtime_dict_oos.json")$crsp_realtime, error = function(e) NULL)
+  if (!is.null(rtd)) {
+    oos <- rbindlist(lapply(c("GeoRisk","GeoSentiment"), function(m)
+      data.table(label = "RQ3 L/S, re-learned dict. (CRSP, EW)", measure = m,
+                 t = as.numeric(rtd[[m]]$realtime$t))))
+    d <- rbind(d, oos) }
+  labs_o <- c(sapply(spec[1:5], `[`, 5), "RQ2 Fama–MacBeth (CRSP, quarterly)", sapply(spec[6:7], `[`, 5),
+              "RQ3 L/S, re-learned dict. (CRSP, EW)")
   d[, measure := factor(nice(measure), levels = nice(M4))]
   d[, label := factor(label, levels = rev(labs_o))]
   base <- ggplot(d, aes(measure, label, fill = t)) +
@@ -921,3 +997,65 @@ local({
 cat("figures (colour + bw) OK\n")
 cat("DONE.\n  tables:", length(list.files(tabdir)), " figures:", length(list.files(figdir, pattern="pdf")),
     " bw:", length(list.files(bwdir)), "\n")
+
+# ---------------------------------------------------------------------
+# Sample-construction tables (appendix). Two funnels from the SAME first row:
+#   (1) the global LSEG/RIC branch that carries the headline results
+#   (2) the US CRSP branch used as the robustness sample
+# Every figure is counted live off the _min artefacts, so the tables cannot
+# drift from the panels they describe.
+# TWO THINGS THAT WERE WRONG IN THE FIRST VERSION AND MUST NOT COME BACK:
+#   - the CRSP analysis panel is exposure_firmquarter_crsp JOINED TO
+#     crsp_returns_quarterly (as 05i_crsp_analysis.R does), NOT the US subset
+#     of the global RIC panel. The two differ (219,939 vs 196,141).
+#   - book-to-market comes from CONTROLS_PANEL.rds (LSEG-derived, keyed on RIC)
+#     and lives on the GLOBAL branch. It is not Compustat and not a CRSP step.
+# NOTE ON SCOPE: call and firm-quarter counts only. Per-step SENTENCE counts are
+# deliberately absent: the only sentence audit on disk (out/corpus/audit_*.csv)
+# is the 2026-07-21 v1.1 run, which applied a safe-harbour filter the v2 minimal
+# build does not, so it would contradict Section 3.2.
+# ---------------------------------------------------------------------
+local({
+  rd <- function(p) tryCatch(as.data.table(readRDS(file.path(root, p))), error = function(e) NULL)
+  ca <- rd("out/exposure_min/exposure_calls.rds");            cd <- rd("out/exposure_min/exposure_calls_dedup.rds")
+  fq <- rd("out/exposure_min/exposure_firmquarter.rds");      fr <- rd("out/exposure_min/exposure_firmquarter_ric.rds")
+  fc <- rd("out/exposure_min/exposure_firmquarter_crsp.rds")
+  rq <- rd("out/analysis/crsp_returns_quarterly.rds")
+  pg <- rd(file.path("out/analysis", paste0("panel_ric", TAG, ".rds")))
+  if (is.null(pg)) pg <- rd("out/analysis/panel_ric_min.rds")
+  if (any(sapply(list(ca, cd, fq, fr, fc, rq, pg), is.null))) { message("sample tables: inputs missing, skipped"); return(invisible()) }
+  nf <- function(x) length(unique(x[!is.na(x)]))
+  fN <- function(x) formatC(as.numeric(x), format = "d", big.mark = ",")
+  N0 <- nrow(ca)
+  row <- function(lab, n, f) sprintf("%s & %s & %s & %.1f \\\\", lab, fN(n), fN(f), 100 * n / N0)
+  hdr <- c("Step & Observations & Firms & \\% of row 1\\\\")
+
+  ## --- (1) global LSEG / RIC branch -----------------------------------
+  g <- c(
+    row("Raw transcript rows in the LSEG feed",            N0,                   nf(ca$ticker)),
+    row("Drop duplicate transcript versions",              nrow(cd),             nf(cd$ric)),
+    row("Keep calls with a RIC valid at the call",         sum(!is.na(cd$ric)),  nf(cd$ric)),
+    row("Aggregate calls to the firm-quarter",             nrow(fq),             nf(fq$ticker)),
+    row("Keep firm-quarters carrying a RIC",               nrow(fr),             nf(fr$ric)),
+    row("Join returns and firm controls (analysis panel)", nrow(pg),             nf(pg$Ticker)),
+    row("Of which with a book-to-market ratio",            sum(is.finite(pg$BM)), nf(pg$Ticker[is.finite(pg$BM)])))
+  writetab("tab_sample_global.tex", tabular("lrrr", hdr, g))
+
+  ## --- (2) US CRSP branch, rebuilt exactly as 05i_crsp_analysis.R does --
+  f2 <- copy(fc); f2[, Quarter := as.Date(ISOdate(year, (quarter - 1L) * 3L + 1L, 1L))]
+  f2[, permno := as.integer(permno)]; r2 <- copy(rq)[, permno := as.integer(permno)]
+  pj <- merge(f2, r2[, .(permno, Quarter, RetQ)], by = c("permno", "Quarter"))
+  setorder(pj, permno, Quarter)
+  pj[, Ret_lead := shift(RetQ, 1L, type = "lead"), by = permno]
+  pj[, Qn := shift(Quarter, 1L, type = "lead"), by = permno]
+  pj[is.na(Qn) | as.integer(Qn - Quarter) > 95L, Ret_lead := NA_real_]
+  pa <- pj[!is.na(Ret_lead)]
+  c2 <- c(
+    row("Raw transcript rows in the LSEG feed",        N0,                      nf(ca$ticker)),
+    row("Drop duplicate transcript versions",          nrow(cd),                nf(cd$ric)),
+    row("Match the call to a CRSP permno",             sum(!is.na(cd$permno)),  nf(cd$permno)),
+    row("Aggregate calls to the firm-quarter",         nrow(fc),                nf(fc$permno)),
+    row("Join CRSP quarterly returns",                 nrow(pj),                nf(pj$permno)),
+    row("Require a next-quarter return (analysis panel)", nrow(pa),             nf(pa$permno)))
+  writetab("tab_sample_crsp.tex", tabular("lrrr", hdr, c2))
+  cat("wrote tab_sample_global.tex + tab_sample_crsp.tex\n") })
