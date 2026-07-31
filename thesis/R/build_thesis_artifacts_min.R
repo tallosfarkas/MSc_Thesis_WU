@@ -57,7 +57,12 @@ theme_thesis <- function(base = 11)
         plot.title = element_text(face = "bold", size = base),
         legend.position = "bottom", legend.title = element_blank(),
         legend.key.width = unit(1.1, "lines"))
-PASTEL  <- c("#8FB8DE", "#F2A6A6", "#A8D5A2", "#C9A0DC", "#F4D06F", "#7FC9C3")  # soft blue/coral/green/lilac/gold/teal
+# Categorical palette: blues and greys only. Chosen for PRINT -- the series separate
+# by lightness, not by hue, so the figure survives a black-and-white printer, a
+# photocopier and every form of colour blindness. The earlier pastel set failed on
+# contrast (1.6-2.1 against white, where 3 is the floor); these steps clear it.
+# Order is fixed, so a series keeps its slot across every figure.
+PASTEL  <- c("#1F4E79", "#6FA8D0", "#767676", "#BDBDBD", "#3E7CB1", "#9A9A9A")  # deep blue / light blue / grey
 PASTEL5 <- c("#BcD7EE", "#9FC2E0", "#6FA8D0", "#3E7CB1", "#1F4E79")             # pastel->deep blue (quintiles)
 GREY5   <- c("#cfcfcf", "#a0a0a0", "#707070", "#404040", "#000000")
 # Prefer cairo_pdf (nicer fonts; the cluster/audited path). Where the cairo device
@@ -192,6 +197,19 @@ local({
 local({ writetab("tab_q3_crsp_quarterly.tex", tabular("lcc", hdr3, rows_crsp(J("crsp_analysis.json")$q3))) })
 # CRSP US, MONTHLY (headline)
 local({ writetab("tab_q3_crsp_monthly.tex", tabular("lcc", hdr3, rows_crsp(cm$q3))) })
+# Winsorisation robustness -- the headline EW alpha with monthly returns winsorised at
+# 0.5/99.5 (the main specification) against raw returns. Built here rather than typed:
+# the hand-maintained version had drifted, showing 0.26** where the generated CRSP
+# table shows 0.26*** for the same estimate (|t| = 2.74 clears the 1% cutoff).
+local({
+  w <- cm$q3; r <- J("crsp_monthly_rawrb.json")$q3
+  g <- function(df, m, col) df[[col]][df$measure == m]
+  rows <- vapply(c("GeoRisk", "GeoSentiment"), function(m)
+    sprintf("%s & %s & %s \\\\", nice(m),
+            fcell(g(w, m, "ew_alpha"), g(w, m, "ew_t")),
+            fcell(g(r, m, "ew_alpha"), g(r, m, "ew_t"))), character(1))
+  writetab("tab_winsor_robustness.tex",
+           tabular("lcc", c(" & Winsorised (0.5/99.5) & Raw \\\\"), rows)) })
 # LSEG US-only, QUARTERLY (appendix)
 local({
   pu <- J("portfolio_sorts_ric_us.json")$results
@@ -261,15 +279,15 @@ local({
 
 ## Robustness -- GeoRisk L/S across all measures x specifications
 local({
-  rb <- J("robustness_q3.json"); meas <- c("GeoExposure","GeoRisk","GeoSentiment")
+  rb <- J("robustness_q3.json"); meas <- c("GeoExposure","GeoExposureTFIDF","GeoRisk","GeoSentiment")
   splits <- c("quintile","decile","size_neutral","pre2018","post2018","sic2_adj","fic300_adj")
   lab <- c("Quintile","Decile","Size-neutral","Pre-2018","Post-2018","Industry-adj.","FIC300-adj.")
   rows <- vapply(seq_along(splits), function(j) {
     cells <- vapply(meas, function(m) { x <- rb[[m]][[splits[j]]]; fcell(x[1], x[2]) }, character(1))
     sprintf("%s & %s \\\\", lab[j], paste(cells, collapse = " & ")) }, character(1))
-  writetab("tab_robustness_all.tex", tabular("lccc",
-    c("Specification & GeoExposure & GeoRisk & GeoSentiment\\\\",
-      " & $\\alpha$~$(t)$ & $\\alpha$~$(t)$ & $\\alpha$~$(t)$\\\\"), rows)) })
+  writetab("tab_robustness_all.tex", tabular("lcccc",
+    c("Specification & GeoExposure & GeoExposure (TF-IDF) & GeoRisk & GeoSentiment\\\\",
+      " & $\\alpha$~$(t)$ & $\\alpha$~$(t)$ & $\\alpha$~$(t)$ & $\\alpha$~$(t)$\\\\"), rows)) })
 
 ## Full monthly sort grid -- DISABLED for v2: tab_q3_grid.tex is built CRSP-only and kept static (do not clobber)
 if (FALSE) local({
@@ -359,7 +377,7 @@ local({
   pc <- base + geom_line(linewidth=0.75) + scale_colour_manual(values=c("Q5 (high)"="#4A88C7","Q1 (low)"="#B0B0B0"), name=NULL)
   pb <- base + geom_line(aes(linetype=grp), colour="black", linewidth=0.5) +
     scale_linetype_manual(values=c("Q5 (high)"="solid","Q1 (low)"="22"), name=NULL)
-  save_both("fig_q1_caar_grid.pdf", pc, pb, w=7, h=4.6) })
+  save_both("fig_q1_caar_grid.pdf", pc, pb, w=7, h=3.6) })   # short aspect: table+figure share one page
 
 ## Fig 3 -- GeoRisk FF5 alpha across factor models, with 95% CI (spanning)
 local({
@@ -458,7 +476,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
       labs(x=NULL, y=NULL) + theme_thesis() +
       theme(panel.grid=element_blank(), legend.position="right", legend.title=element_text(size=9))
     if (diverging) {
-      pc <- base + scale_fill_gradient2(low="#C0504D", mid="#F7F7F7", high="#1F4E79", midpoint=0, name=label)
+      pc <- base + scale_fill_gradient2(low="#767676", mid="#F7F7F7", high="#1F4E79", midpoint=0, name=label)
       pb <- base + scale_fill_gradient2(low="grey35", mid="grey96", high="black",   midpoint=0, name=label)
     } else {
       pc <- base + scale_fill_gradient(low="#EAF2FB", high="#1F4E79", name=label)
@@ -511,7 +529,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
                  P10=SC*quantile(x,.10), Med=SC*median(x), P90=SC*quantile(x,.90), NZ=100*mean(x>0)) }))
     rows <- st[, sprintf("%s & %s & %s & %s & %s & %s & %s & %s \\\\", Measure,
         formatC(N, big.mark=",", format="d"), fnum(Mean,2), fnum(SD,2), fnum(P10,2), fnum(Med,2), fnum(P90,2), fnum(NZ,1))]
-    writetab("tab_summary.tex", tabular("lrrrrrrr",
+    writetab("tab_summary.tex", tabular("lccccccc",
       c("Measure & $N$ & Mean & SD & p10 & Median & p90 & \\% $>0$\\\\"), rows)) })
     # NB: the Section 4.1 inline summary numbers are computed live in the .Rnw setup
     # chunk (SUM$...) and spliced via \Sexpr, matching how GPR_RHO etc. work here;
@@ -525,7 +543,7 @@ if (is.null(PN)) cat("panel_ric_min.rds not found -- skipping RQ1 extra figures\
            by=div][N>=minN][order(-Exp)]
     rows <- s[, sprintf("%s & %s & %s & %s & %s & %s \\\\", div,
         formatC(N, big.mark=",", format="d"), fnum(Exp,2), fnum(Tf,2), fnum(Rk,2), fnum(St,2))]
-    writetab(file, tabular("lrrrrr",
+    writetab(file, tabular("lccccc",
       c("Sector (SIC division) & $N$ & GeoExposure & GeoExposure (TF-IDF) & GeoRisk & GeoSentiment\\\\"), rows)) }
   st_sector(0,   "tab_exposure_by_sector.tex")
   st_sector(500, "tab_exposure_by_sector_maj.tex")
@@ -589,7 +607,7 @@ local({
   baseq <- ggplot(qd, aes(Q, ret, fill=Q)) + geom_col(width=0.78) + facet_wrap(~measure, nrow=2) +
     labs(x="Exposure quintile", y="Mean next-quarter return (%)") + theme_thesis() + theme(legend.position="none")
   save_both("fig_q2_quintile.pdf", baseq + scale_fill_manual(values=PASTEL5),
-                                    baseq + scale_fill_manual(values=GREY5), w=8.4, h=6.0)
+                                    baseq + scale_fill_manual(values=GREY5), w=6.4, h=5.0)
 
   ## Fig q2 tone legs -- GeoSentiment / Pos / Neg forward t, Fama-MacBeth vs panel FE (the underreaction split)
   sd <- J("sentiment_decomp.json")$results
@@ -668,16 +686,16 @@ local({
     facet_wrap(~measure, ncol=1) +
     geom_hline(yintercept=0, colour="grey60") + labs(x="Characteristic tercile (low to high)", y="FF5 alpha (%/quarter)") + theme_thesis()
   save_both("fig_q3_characteristics.pdf",
-    bc + scale_fill_manual(values=PASTEL[c(1,2,6)], name=NULL),
+    bc + scale_fill_manual(values=PASTEL[1:3], name=NULL),
     bc + scale_fill_manual(values=c("grey30","grey55","grey78"), name=NULL), h=5.0)
 
   ## Fig -- GeoRisk quintile next-quarter return by region (A15)
   rlab <- c(NorthAmerica="North America", Europe="Europe", AsiaPacific_DM="Asia-Pacific (DM)", EM="Emerging Markets")
   rg <- as.data.table(M$region$GeoRisk$means); rg <- rg[Region %in% names(rlab)]
   rg[, Region:=factor(rlab[Region], levels=rlab)][, Q:=factor(paste0("Q",q), levels=paste0("Q",1:5))]
-  br <- ggplot(rg, aes(Q, 100*ew, fill=Q)) + geom_col(width=0.78) + facet_wrap(~Region, nrow=1) +
+  br <- ggplot(rg, aes(Q, 100*ew, fill=Q)) + geom_col(width=0.78) + facet_wrap(~Region, nrow=2) +
     labs(x="Risk-exposure quintile", y="Mean next-quarter return (%)") + theme_thesis() + theme(legend.position="none")
-  save_both("fig_q3_region.pdf", br + scale_fill_manual(values=PASTEL5), br + scale_fill_manual(values=GREY5), w=11, h=4.2)
+  save_both("fig_q3_region.pdf", br + scale_fill_manual(values=PASTEL5), br + scale_fill_manual(values=GREY5), w=6.4, h=4.6)
 
   ## Table -- illiquidity + reversal absorb much of the alpha (A16)
   ef <- J("extra_factors.json"); mods <- c(M0_FF5="FF5", M1_FF5_UMD="$+$ UMD", M2_FF5_BAB_QMJ="$+$ BAB, QMJ", M3_FF5_ILLIQ_REV="$+$ illiq, rev", M4_all="$+$ all")
@@ -776,8 +794,8 @@ local({
     guides(colour = guide_legend(nrow = 2, order = 1), linetype = guide_legend(nrow = 2, order = 1),
            linewidth = guide_legend(nrow = 2, order = 1), fill = guide_legend(order = 2))
   save_both("fig_gpr_validation.pdf",
-    base + scale_colour_manual(values = c("#3E7CB1", "#D9827E", "#5FA05A", "#9C7FC4"), name = NULL) +
-      scale_linetype_manual(values = rep("solid", 4), name = NULL) +
+    base + scale_colour_manual(values = c("#1F4E79", "#6FA8D0", "#767676", "#BDBDBD"), name = NULL) +
+      scale_linetype_manual(values = c("solid", "solid", "22", "42"), name = NULL) +
       scale_fill_manual(values = c("GPR threats (shaded)" = "grey85"), name = NULL),
     base + scale_colour_manual(values = c("black", "grey35", "grey55", "black"), name = NULL) +
       scale_linetype_manual(values = c("solid", "solid", "22", "42"), name = NULL) +
@@ -792,19 +810,22 @@ local({
     c("Q1_realization","contemp_ret","LSEG","quarterly","RQ1 return at the call (LSEG)"),
     c("Q1_ivol","ivol_coef","LSEG","quarterly","RQ1 idiosyncratic vol (LSEG)"),
     c("Q1_tvol","tvol_coef","LSEG","quarterly","RQ1 total vol (LSEG)"),
-    c("Q2_pricing_FM","lambda","LSEG","quarterly","RQ2 Fama-MacBeth (LSEG)"),
+    c("Q2_pricing_FM","lambda","LSEG","quarterly","RQ2 Fama–MacBeth (LSEG)"),
     c("Q2_pricing_FE","coef","LSEG","quarterly","RQ2 panel FE (LSEG)"),
     c("Q3_LS_FF5","ls_ew_mean","LSEG","quarterly","RQ3 L/S mean spread (LSEG, EW)"),
     c("Q3_LS_FF5","ew_alpha","CRSP","monthly","RQ3 L/S FF5 alpha (CRSP, EW)"))
   d <- rbindlist(lapply(spec, function(s) {
     x <- MM[question == s[1] & stat == s[2] & sample == s[3] & freq == s[4] & measure %in% M4]
     data.table(label = s[5], measure = x$measure, t = as.numeric(x$t)) }))
-  ## RQ2 Fama-MacBeth on genuine CRSP returns (monthly) -- from crsp_analysis, not RESULTS_MASTER
+  ## RQ2 Fama-MacBeth on genuine CRSP returns, QUARTERLY -- from crsp_analysis, not
+  ## RESULTS_MASTER. Quarterly is deliberate: the LSEG RQ2 rows above are quarterly too,
+  ## so the row is like-for-like. Table C.3 reports the MONTHLY CRSP version separately,
+  ## which is why its t-stats differ; the label states the frequency to avoid confusion.
   cq2 <- J("crsp_analysis.json")$q2
-  d <- rbind(d, data.table(label = "RQ2 Fama-MacBeth (CRSP)",
+  d <- rbind(d, data.table(label = "RQ2 Fama–MacBeth (CRSP, quarterly)",
                            measure = cq2$measure[cq2$measure %in% M4],
                            t = as.numeric(cq2$fm_t[cq2$measure %in% M4])))
-  labs_o <- c(sapply(spec[1:5], `[`, 5), "RQ2 Fama-MacBeth (CRSP)", sapply(spec[6:7], `[`, 5))
+  labs_o <- c(sapply(spec[1:5], `[`, 5), "RQ2 Fama–MacBeth (CRSP, quarterly)", sapply(spec[6:7], `[`, 5))
   d[, measure := factor(nice(measure), levels = nice(M4))]
   d[, label := factor(label, levels = rev(labs_o))]
   base <- ggplot(d, aes(measure, label, fill = t)) +
@@ -813,11 +834,89 @@ local({
     labs(x = NULL, y = NULL) + theme_thesis() +
     theme(panel.grid = element_blank(), legend.position = "none",
           axis.text.x = element_text(angle = 18, hjust = 1))
-  pc <- base + scale_fill_gradient2(low = "#C0504D", mid = "white", high = "#1F4E79",
+  pc <- base + scale_fill_gradient2(low = "#767676", mid = "white", high = "#1F4E79",
                                     limits = c(-6, 6), oob = scales::squish)
   pb <- base + scale_fill_gradient2(low = "grey55", mid = "white", high = "grey55",
                                     limits = c(-6, 6), oob = scales::squish)
   save_both("fig_t_heatmap.pdf", pc, pb, w = 6.8, h = 4.1) })
+
+# ---------------------------------------------------------------------
+# Word cloud of the top-100 discovered bigrams, sized by KEYNESS (G^2).
+# Companion to Table C.1, which lists the same 100 terms sorted by raw
+# frequency. Keyness is the actual selection criterion (Eq. 3.1), so the
+# cloud shows what the algorithm ranked on rather than repeating the
+# table's ordering. Font size is proportional to sqrt(G2) so that the
+# printed AREA of a term scales with its keyness, and colour is a
+# sequential light->dark bin of the same quantity (a second, redundant
+# encoding of magnitude, so it survives greyscale printing).
+# Layout is a deterministic Archimedean spiral with bounding-box
+# collision rejection: no RNG, so the figure is byte-reproducible.
+# ---------------------------------------------------------------------
+local({
+  f <- file.path(root, "pipeline/config/dictionary_geoeconomic.csv")
+  d <- tryCatch(read.csv(f, stringsAsFactors = FALSE), error = function(e) NULL)
+  if (is.null(d)) { cat("dictionary csv missing -- fig_top100_cloud skipped\n"); return(invisible()) }
+  d <- d[d$origin == "discovered", ]
+  d <- d[order(-d$G2), ][seq_len(min(100, nrow(d))), ]
+  d$G2 <- as.numeric(d$G2)
+
+  # size: area ~ G2  =>  linear font size ~ sqrt(G2), rescaled to a legible band
+  s  <- sqrt(d$G2); SMIN <- 2.5; SMAX <- 6.0
+  d$size <- SMIN + (SMAX - SMIN) * (s - min(s)) / (max(s) - min(s))
+  d$bin  <- cut(d$G2, breaks = quantile(d$G2, probs = seq(0, 1, length.out = 6)),
+                include.lowest = TRUE, labels = FALSE)
+
+  # Deterministic spiral packing, largest term first. Text extents are MEASURED
+  # on a null device (base strwidth at the matching point size) rather than
+  # estimated from character count -- an estimate underestimates wide serif
+  # glyphs and produces overlaps. Units are inches throughout; no RNG.
+  grDevices::pdf(NULL, width = 7, height = 5); on.exit(grDevices::dev.off(), add = TRUE)
+  par(family = "serif", ps = 12)
+  pt   <- 2.845276                       # ggplot size (mm) -> points
+  win  <- vapply(seq_len(nrow(d)), function(i)
+            strwidth(d$bigram[i], units = "inches", cex = d$size[i] * pt / 12), numeric(1))
+  win  <- win * 1.10   # cairo's serif runs wider than the measuring device's; safety factor
+  hin  <- d$size * pt / 72 * 1.0         # cap-height box
+  n <- nrow(d); x <- y <- numeric(n)
+  PADX <- 0.040; PADY <- 0.026           # inches of clear space around each term
+  hit <- function(i, xi, yi) {
+    if (i == 1L) return(FALSE)
+    j <- seq_len(i - 1L)
+    any(abs(xi - x[j]) < (win[i] + win[j]) / 2 + PADX &
+        abs(yi - y[j]) < (hin[i] + hin[j]) / 2 + PADY)
+  }
+  for (i in seq_len(n)) {
+    if (i == 1L) { x[i] <- 0; y[i] <- 0; next }
+    t <- 0; placed <- FALSE; xi <- 0; yi <- 0
+    while (!placed && t < 60000) {
+      t  <- t + 1
+      th <- t * 0.045
+      r  <- 0.055 * th
+      xi <- r * cos(th) * 1.85; yi <- r * sin(th)     # wide ellipse (page is landscape)
+      if (!hit(i, xi, yi)) placed <- TRUE
+    }
+    x[i] <- xi; y[i] <- yi
+  }
+  d$x <- x; d$y <- y
+
+  base <- ggplot(d, aes(x, y, label = bigram, size = size)) +
+    scale_size_identity() +
+    scale_x_continuous(expand = expansion(add = max(win) / 2 + 0.05)) +
+    scale_y_continuous(expand = expansion(add = max(hin) / 2 + 0.05)) +
+    theme_void(base_family = "serif") +
+    theme(legend.position = "none", plot.margin = margin(2, 2, 2, 2))
+  # sequential one-hue ramp, light->dark, but floored so the palest terms stay
+  # legible on paper (the two lightest PASTEL5 steps wash out when printed).
+  CLOUD5 <- c("#9FC2E0", "#7FAED4", "#5B93C4", "#3E7CB1", "#1F4E79")
+  CLOUDB <- c("#9a9a9a", "#7a7a7a", "#585858", "#333333", "#000000")
+  pc <- base + geom_text(aes(colour = factor(bin)), family = "serif", show.legend = FALSE) +
+        scale_colour_manual(values = CLOUD5)
+  pb <- base + geom_text(aes(colour = factor(bin)), family = "serif", show.legend = FALSE) +
+        scale_colour_manual(values = CLOUDB)
+  save_both("fig_top100_cloud.pdf", pc, pb, w = 6.3, h = 3.7)
+  cat(sprintf("fig_top100_cloud: %d terms, G2 %s-%s\n", n,
+              format(min(d$G2), big.mark = ","), format(max(d$G2), big.mark = ",")))
+})
 
 cat("figures (colour + bw) OK\n")
 cat("DONE.\n  tables:", length(list.files(tabdir)), " figures:", length(list.files(figdir, pattern="pdf")),

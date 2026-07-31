@@ -26,7 +26,7 @@ vS <- function(p) if (nzchar(TAG)) sub("\\.([A-Za-z0-9]+)$", paste0(TAG,".\\1"),
 TIEM <- if (FIX) "random" else "first"; if (FIX) set.seed(20250401L); if (nzchar(Sys.getenv("GEO_TIES"))) TIEM <- Sys.getenv("GEO_TIES")
 RP <- if (RAW) "RetM" else "RetM_w"
 
-MEAS <- c("GeoExposure","GeoRisk","GeoSentiment"); NW <- 6L
+MEAS <- c("GeoExposure","GeoExposureTFIDF","GeoRisk","GeoSentiment"); NW <- 6L
 
 p <- as.data.table(readRDS(vS(file.path(ANA,"panel_ric_monthly.rds"))))[is.finite(RetM_w)]
 # FIC300 (Hoberg-Phillips text-based industry) from the HP controls panel

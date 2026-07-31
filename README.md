@@ -42,9 +42,9 @@ for the full check-list and tolerances):
 | Stage | Result |
 |---|---|
 | **RQ1 Realize** | A one-SD rise in geoeconomic talk meets a **−0.53%** same-quarter return (*t* = −5.49). Volatility **falls**, so the call resolves uncertainty. GeoSentiment goes the opposite way (**+1.42%**, *t* = 13.79). |
-| **RQ2 Price** | Only the **tone** is priced: GeoSentiment **+0.26%/quarter** (*t* = 2.05 Fama–MacBeth, 2.96 panel FE). The count measures are not priced. Same positive sign at the call *and* a quarter ahead ⇒ **underreaction**, not a risk premium. |
+| **RQ2 Price** | Only **GeoSentiment** is priced: **+0.26%/quarter** (*t* = 2.05 Fama–MacBeth, 2.96 panel FE). The count measures are not priced. Same positive sign at the call *and* a quarter ahead ⇒ **underreaction**, not a risk premium. |
 | **RQ3 Trade** | GeoRisk long–short **0.26%/month** five-factor alpha (*t* = 2.74, US CRSP, equal-weighted). The GeoSentiment in-sample sort is a null under minimal cleaning (*t* = 1.80); its premium shows up out of sample instead. |
-| **Out-of-sample** | Re-learning the dictionary on pre-date text only: the tone premium **survives** and strengthens (*t* = 2.58); the GeoRisk alpha **does not** (*t* = −0.06). |
+| **Out-of-sample** | Re-learning the dictionary on pre-date text only: the GeoSentiment premium **survives** and strengthens (*t* = 2.58); the GeoRisk alpha **does not** (*t* = −0.06). |
 | **Net of costs** | GeoRisk 3.2% → **1.7%**/yr, GeoSentiment 2.3% → **0.9%**/yr. |
 
 Honest qualifiers, stated in the thesis and reproduced by this code: the priced and tradeable

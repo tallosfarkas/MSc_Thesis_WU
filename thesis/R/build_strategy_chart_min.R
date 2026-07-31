@@ -66,7 +66,7 @@ long[, series := factor(series, levels = rcols, labels = labs[rcols])]
 theme_thesis <- function(base = 11) theme_minimal(base_size = base, base_family = "serif") +
   theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(),
         plot.title = element_text(face = "bold", size = base), legend.position = "bottom", legend.title = element_blank())
-PASTEL <- c("#3E7CB1", "#F2A6A6", "#A8D5A2")  # deep-pastel blue / coral / green
+PASTEL <- c("#1F4E79", "#6FA8D0", "#767676")  # deep blue / light blue / grey (see build_thesis_artifacts_min.R)
 base <- ggplot(long, aes(Month, growth, group = series)) +
   geom_hline(yintercept = 1, colour = "grey80") +
   labs(x = NULL, y = "Cumulative growth of $1") + theme_thesis()
@@ -93,8 +93,8 @@ ls_series <- function(meas) {
 }
 NICE4 <- c(GeoExposure = "GeoExposure", GeoExposureTFIDF = "GeoExposure (TF-IDF)",
            GeoRisk = "GeoRisk", GeoSentiment = "GeoSentiment")
-MCOL4 <- c("GeoExposure" = "#8FB8DE", "GeoExposure (TF-IDF)" = "#F2A6A6",
-           "GeoRisk" = "#A8D5A2", "GeoSentiment" = "#C9A0DC")
+MCOL4 <- c("GeoExposure" = "#1F4E79", "GeoExposure (TF-IDF)" = "#6FA8D0",
+           "GeoRisk" = "#767676", "GeoSentiment" = "#BDBDBD")
 
 # 2x1 legs facet: GeoRisk + GeoSentiment, Q5/Q1 legs vs the FF market, with the L/S
 # (reproduces the MTS deck fig_G2 (RQ3 slide) + fig_G2b (A12b) exactly: first ties, total
@@ -120,15 +120,15 @@ legrows <- function(meas, mlab) {
 }
 legs2 <- rbindlist(list(legrows("GeoRisk", "GeoRisk"), legrows("GeoSentiment", "GeoSentiment")))
 legs2[, measure := factor(measure, levels = c("GeoRisk", "GeoSentiment"))]
-SERCOL <- setNames(c("#8FB8DE", "#A8D5A2", "grey45", "#F2A6A6"), SER)   # Q5 blue, Q1 green, market grey, L/S coral
-SERLTY <- setNames(c("solid", "solid", "dashed", "solid"), SER)
+SERCOL <- setNames(c("#1F4E79", "#6FA8D0", "#9A9A9A", "#333333"), SER)  # Q5 deep blue, Q1 light blue, market grey, L/S near-black
+SERLTY <- setNames(c("solid", "22", "solid", "solid"), SER)   # Q1 dashed: second channel for the leg pair
 SERLTYBW <- setNames(c("solid", "dotted", "dashed", "longdash"), SER)
 # one single-panel legs figure per measure (split from the old 2-panel so each is shorter)
 one_legs <- function(mlab, colour = TRUE) {
   g <- ggplot(legs2[measure == mlab], aes(Month, cum, colour = series, linetype = series)) +
     geom_hline(yintercept = 1, colour = "grey80") +
     scale_x_date(date_breaks = "3 years", date_labels = "%Y") + scale_y_log10() +
-    labs(x = NULL, y = "Cumulative value (log, 1 = start)") + theme_thesis()
+    labs(x = NULL, y = "Cumulative growth of $1 (log, 1 = start)") + theme_thesis()
   if (colour) g + geom_line(linewidth = 0.8) + scale_colour_manual(values = SERCOL, name = NULL) +
       scale_linetype_manual(values = SERLTY, name = NULL)
   else g + geom_line(colour = "black", linewidth = 0.6) + scale_linetype_manual(values = SERLTYBW, name = NULL) +
@@ -149,7 +149,7 @@ allm <- rbindlist(lapply(names(NICE4), function(mm) {
 allm[, measure := factor(measure, levels = unname(NICE4))]
 pAbase <- ggplot(allm, aes(Month, cum)) + geom_hline(yintercept = 1, colour = "grey70") +
   scale_x_date(date_breaks = "3 years", date_labels = "%Y") + scale_y_log10() +
-  labs(x = NULL, y = "Cumulative value (log, 1 = start)") + theme_thesis()
+  labs(x = NULL, y = "Cumulative growth of $1 (log, 1 = start)") + theme_thesis()
 ggsave(file.path(figdir, "fig_q3_cumret_all.pdf"),
        pAbase + geom_line(aes(colour = measure), linewidth = 0.9) + scale_colour_manual(values = MCOL4, name = NULL),
        width = 6.6, height = 4.0, device = PDF_DEV)
@@ -236,27 +236,85 @@ for (mm in c("GeoRisk", "GeoSentiment")) {
 TAG <- Sys.getenv("GEO_TAG")   # honour the version tag like 05b-05o do
 write_json(tc_out, file.path(root, paste0("out/analysis/q3_trading_costs", TAG, ".json")), auto_unbox = TRUE, digits = 4)
 tc_dt <- rbindlist(tc_long); tcw <- rbindlist(tc_wide)
-SLEV <- c("Gross", "Net of costs", "OOS gross", "OOS net of costs")
+# total-market benchmark on the same months as each panel, built exactly as in fig 4.8/4.9
+# (MktRF + RF, starting at 1) so the two cumulative-growth figures are directly comparable.
+mkt_tc <- rbindlist(lapply(c("GeoRisk", "GeoSentiment"), function(mm) {
+  mo <- sort(unique(tc_dt[measure == mm & series == "Gross", Month]))
+  mk <- mkt_tot[Month %in% mo]; setorder(mk, Month)
+  data.table(Month = c(min(mk$Month) %m-% months(1L), mk$Month),
+             cum = c(1, cumprod(1 + mk$mkt)), series = "FF market", measure = mm) }))
+tc_dt <- rbind(tc_dt, mkt_tc, fill = TRUE)
+SLEV <- c("Gross", "Net of costs", "OOS gross", "OOS net of costs", "FF market")
 tc_dt[, `:=`(series = factor(series, levels = SLEV), measure = factor(measure, levels = c("GeoRisk", "GeoSentiment")))]
 tcw[, measure := factor(measure, levels = c("GeoRisk", "GeoSentiment"))]
 # shade the cost drag = the area between the gross and net paths (in-sample pair only);
-# the OOS pair (re-learned dictionary book, starts 2013) is drawn dashed on the same panel
-tcbase <- ggplot() + geom_hline(yintercept = 1, colour = "grey80") +
-  facet_wrap(~measure, ncol = 1, scales = "free_y") + scale_x_date(date_breaks = "3 years", date_labels = "%Y") +
-  labs(x = NULL, y = "Cumulative growth of $1") + theme_thesis()
-ggsave(file.path(figdir, "fig_q3_netcost.pdf"),
-       tcbase + geom_ribbon(data = tcw, aes(Month, ymin = net, ymax = gross), fill = "#F2A6A6", alpha = 0.30) +
-         geom_line(data = tc_dt, aes(Month, cum, colour = series, linetype = series), linewidth = 0.7) +
-         scale_colour_manual(values = c("Gross" = "#8FB8DE", "Net of costs" = "#D9534F",
-                                        "OOS gross" = "#3E7CB1", "OOS net of costs" = "#8A3634"), name = NULL) +
-         scale_linetype_manual(values = c("Gross" = "solid", "Net of costs" = "solid",
-                                          "OOS gross" = "22", "OOS net of costs" = "22"), name = NULL),
-       width = 6.4, height = 5.2, device = PDF_DEV)
-ggsave(file.path(bwdir, "fig_q3_netcost.pdf"),
-       tcbase + geom_ribbon(data = tcw, aes(Month, ymin = net, ymax = gross), fill = "grey70", alpha = 0.35) +
-         geom_line(data = tc_dt, aes(Month, cum, linetype = series), colour = "black", linewidth = 0.6) +
-         scale_linetype_manual(values = c("Gross" = "solid", "Net of costs" = "42",
-                                          "OOS gross" = "22", "OOS net of costs" = "13"), name = NULL),
-       width = 6.4, height = 5.2, device = PDF_DEV)
-cat(sprintf("wrote fig_q3_netcost.pdf; GeoRisk gross %.2f%%/net %.2f%%; GeoSent gross %.2f%%/net %.2f%%\n",
+# the OOS pair (re-learned dictionary book, starts 2013) is drawn dashed on the same panel.
+# One figure PER measure (not a 2x1 facet): each strategy gets the full width, its own
+# y-axis and its own legend, so the market benchmark stays readable against the paths.
+# Colour carries gross-vs-net, the dash carries in-sample-vs-out. That is one fewer
+# thing for the reader to hold, and it drops the pale blue that read as grey in print.
+CCOL <- c("Gross" = "#6FA8D0", "Net of costs" = "#1F4E79", "OOS gross" = "#6FA8D0",
+          "OOS net of costs" = "#1F4E79", "FF market" = "#9A9A9A")
+CLTY <- c("Gross" = "solid", "Net of costs" = "solid", "OOS gross" = "22",
+          "OOS net of costs" = "22", "FF market" = "solid")
+BLTY <- c("Gross" = "solid", "Net of costs" = "42", "OOS gross" = "22",
+          "OOS net of costs" = "13", "FF market" = "longdash")
+for (mm in c("GeoRisk", "GeoSentiment")) {
+  stub <- if (mm == "GeoRisk") "risk" else "sent"
+  d <- tc_dt[measure == mm]; w <- tcw[measure == mm]
+  base <- ggplot() + geom_hline(yintercept = 1, colour = "grey80") +
+    scale_x_date(date_breaks = "3 years", date_labels = "%Y") + scale_y_log10() +
+    labs(x = NULL, y = "Cumulative growth of $1 (log, 1 = start)") + theme_thesis()
+  ggsave(file.path(figdir, paste0("fig_q3_netcost_", stub, ".pdf")),
+         base + geom_ribbon(data = w, aes(Month, ymin = net, ymax = gross), fill = "#6FA8D0", alpha = 0.35) +
+           geom_line(data = d, aes(Month, cum, colour = series, linetype = series), linewidth = 0.7) +
+           scale_colour_manual(values = CCOL, name = NULL) +
+           scale_linetype_manual(values = CLTY, name = NULL),
+         width = 6.4, height = 3.1, device = PDF_DEV)
+  ggsave(file.path(bwdir, paste0("fig_q3_netcost_", stub, ".pdf")),
+         base + geom_ribbon(data = w, aes(Month, ymin = net, ymax = gross), fill = "grey70", alpha = 0.35) +
+           geom_line(data = d, aes(Month, cum, linetype = series), colour = "black", linewidth = 0.6) +
+           scale_linetype_manual(values = BLTY, name = NULL),
+         width = 6.4, height = 3.1, device = PDF_DEV)
+}
+# ---------------------------------------------------------------------
+# Table 4.9 -- annualised return / vol / Sharpe. Rows are the two long-shorts
+# in sample and the same two under the RE-LEARNED real-time dictionary, plus the
+# total market. The long legs are deliberately NOT shown: they are ~market-like
+# and the comparison that matters is spread vs spread. Long-shorts are
+# self-financing, so Sharpe = mean/sd; the market uses the T-bill rate.
+# Written here (not hand-typed) so the table cannot drift from the series.
+# ---------------------------------------------------------------------
+local({
+  ann <- function(r) { r <- r[is.finite(r)]
+    c(ret = 100*12*mean(r), vol = 100*sqrt(12)*sd(r), sh = sqrt(12)*mean(r)/sd(r)) }
+  rows <- list()
+  for (mm in c("GeoRisk", "GeoSentiment")) {
+    a <- ann(tc_net(mm)$gross)
+    rows[[length(rows)+1]] <- sprintf("%s long--short (Q5$-$Q1) & %.1f & %.1f & %.2f \\\\",
+                                      mm, a["ret"], a["vol"], a["sh"])
+    if (!is.null(p_rt)) { b <- ann(tc_net(mm, p_rt)$gross)
+      rows[[length(rows)+1]] <- sprintf("\\quad re-learned dictionary (OOS) & %.1f & %.1f & %.2f \\\\",
+                                        b["ret"], b["vol"], b["sh"]) } }
+  mk <- merge(ff[, .(Month, MktRF, RF)], data.table(Month = sort(unique(tc_dt$Month))), by = "Month")
+  am <- ann(mk$MktRF)                                    # excess of the T-bill rate
+  am_all <- c(ret = 100*12*mean(mk$MktRF + mk$RF), vol = am["vol"], sh = am["sh"])
+  names(am_all) <- c("ret", "vol", "sh")
+  rows[[length(rows)+1]] <- sprintf("Market (Fama--French) & %.1f & %.1f & %.2f \\\\",
+                                    100*12*mean(mk$MktRF + mk$RF), am["vol"], am["sh"])
+  writeLines(c("\\begin{tabular}{lccc}", "\\toprule",
+               " & Return (\\%) & Vol.\\ (\\%) & Sharpe \\\\", "\\midrule",
+               unlist(rows), "\\bottomrule", "\\end{tabular}"),
+             file.path(root, "docs/thesis/tables/tab_q3_sharpe.tex"))
+  # ...and the same figures as JSON, so the Section 4.4 prose can pull them live
+  # instead of repeating them by hand (a typed number here would drift from the table).
+  jj <- list(mkt = as.list(round(am_all, 2)))
+  for (m in c("GeoRisk", "GeoSentiment")) {
+    jj[[m]]     <- as.list(round(ann(tc_net(m)$gross), 2))
+    jj[[paste0(m, "_oos")]] <- if (!is.null(p_rt)) as.list(round(ann(tc_net(m, p_rt)$gross), 2)) else NULL }
+  write_json(jj, file.path(root, paste0("out/analysis/q3_sharpe", TAG, ".json")),
+             auto_unbox = TRUE, digits = 4)
+  cat("wrote tab_q3_sharpe.tex (in-sample + re-learned OOS, long legs dropped)\n") })
+
+cat(sprintf("wrote fig_q3_netcost_{risk,sent}.pdf; GeoRisk gross %.2f%%/net %.2f%%; GeoSent gross %.2f%%/net %.2f%%\n",
     tc_out$GeoRisk$gross_ann, tc_out$GeoRisk$net_ann, tc_out$GeoSentiment$gross_ann, tc_out$GeoSentiment$net_ann))
